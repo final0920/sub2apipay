@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { handlePaymentNotify } from '@/lib/order/service';
-import type { ZPayNotifyParams } from '@/lib/zpay/types';
+import type { EasyPayNotifyParams } from '@/lib/easy-pay/types';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
 
-    const params: ZPayNotifyParams = {
+    const params: EasyPayNotifyParams = {
       pid: searchParams.get('pid') || '',
       name: searchParams.get('name') || '',
       money: searchParams.get('money') || '',
