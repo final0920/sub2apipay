@@ -59,6 +59,7 @@ function PayContent() {
     maxAmount: 1000,
     maxDailyAmount: 0,
   });
+  const [userNotFound, setUserNotFound] = useState(false);
 
   const effectiveUserId = resolvedUserId || userId;
   const isEmbedded = uiMode === 'embedded' && isIframeContext;
@@ -100,6 +101,9 @@ function PayContent() {
             methodLimits: cfgData.config.methodLimits,
           });
         }
+      } else if (cfgRes.status === 404) {
+        setUserNotFound(true);
+        return;
       }
 
       // 有 token 时才尝试获取用户详情和订单
@@ -178,6 +182,17 @@ function PayContent() {
         <div className="text-center text-red-500">
           <p className="text-lg font-medium">无效的用户 ID</p>
           <p className="mt-2 text-sm text-gray-500">请从 Sub2API 平台正确访问充值页面</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (userNotFound) {
+    return (
+      <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
+        <div className="text-center text-red-500">
+          <p className="text-lg font-medium">用户不存在</p>
+          <p className="mt-2 text-sm text-gray-500">请检查链接是否正确，或联系管理员</p>
         </div>
       </div>
     );

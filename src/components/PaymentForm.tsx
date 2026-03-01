@@ -94,14 +94,9 @@ export default function PaymentForm({
     if (type === 'wxpay') {
       return (
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2BB741] text-white">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-            <path
-              d="M5 12.5 10.2 17 19 8"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+            <path d="M10 3C6.13 3 3 5.58 3 8.75c0 1.7.84 3.23 2.17 4.29l-.5 2.21 2.4-1.32c.61.17 1.25.27 1.93.27.22 0 .43-.01.64-.03C9.41 13.72 9 12.88 9 12c0-3.31 3.13-6 7-6 .26 0 .51.01.76.03C15.96 3.98 13.19 3 10 3z" />
+            <path d="M16 8c-3.31 0-6 2.24-6 5s2.69 5 6 5c.67 0 1.31-.1 1.9-.28l2.1 1.15-.55-2.44C20.77 15.52 22 13.86 22 12c0-2.21-2.69-4-6-4z" />
           </svg>
         </span>
       );
