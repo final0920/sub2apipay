@@ -64,7 +64,7 @@ function ResultContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-gray-500">查询支付结果中...</div>
       </div>
     );
@@ -73,7 +73,7 @@ function ResultContent() {
   const isPending = status === 'PENDING';
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md rounded-xl bg-white p-8 text-center shadow-lg">
         {isSuccess ? (
           <>
@@ -147,7 +147,7 @@ export default function PayResultPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
           <div className="text-gray-500">加载中...</div>
         </div>
       }
