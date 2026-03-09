@@ -1,15 +1,17 @@
-import { FILTER_OPTIONS, type OrderStatusFilter } from '@/lib/pay-utils';
+import type { Locale } from '@/lib/locale';
+import { getFilterOptions, type OrderStatusFilter } from '@/lib/pay-utils';
 
 interface OrderFilterBarProps {
   isDark: boolean;
+  locale: Locale;
   activeFilter: OrderStatusFilter;
   onChange: (filter: OrderStatusFilter) => void;
 }
 
-export default function OrderFilterBar({ isDark, activeFilter, onChange }: OrderFilterBarProps) {
+export default function OrderFilterBar({ isDark, locale, activeFilter, onChange }: OrderFilterBarProps) {
   return (
     <div className="flex flex-wrap gap-2">
-      {FILTER_OPTIONS.map((item) => (
+      {getFilterOptions(locale).map((item) => (
         <button
           key={item.key}
           type="button"

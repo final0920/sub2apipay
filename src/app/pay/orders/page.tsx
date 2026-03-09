@@ -7,6 +7,7 @@ import OrderFilterBar from '@/components/OrderFilterBar';
 import OrderSummaryCards from '@/components/OrderSummaryCards';
 import OrderTable from '@/components/OrderTable';
 import PaginationBar from '@/components/PaginationBar';
+import { applyLocaleToSearchParams, pickLocaleText, resolveLocale } from '@/lib/locale';
 import { detectDeviceIsMobile, type UserInfo, type MyOrder, type OrderStatusFilter } from '@/lib/pay-utils';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -24,7 +25,23 @@ function OrdersContent() {
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
   const uiMode = searchParams.get('ui_mode') || 'standalone';
   const srcHost = searchParams.get('src_host') || '';
+  const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
+
+  const text = {
+    missingAuth: pickLocaleText(locale, '缺少认证信息', 'Missing authentication information'),
+    visitOrders: pickLocaleText(locale, '请从 Sub2API 平台正确访问订单页面', 'Please open the orders page from Sub2API'),
+    sessionExpired: pickLocaleText(locale, '登录态已失效，请从 Sub2API 重新进入支付页。', 'Session expired. Please re-enter from Sub2API.'),
+    loadFailed: pickLocaleText(locale, '订单加载失败，请稍后重试。', 'Failed to load orders. Please try again later.'),
+    networkError: pickLocaleText(locale, '网络错误，请稍后重试。', 'Network error. Please try again later.'),
+    switchingMobileTab: pickLocaleText(locale, '正在切换到移动端订单 Tab...', 'Switching to mobile orders tab...'),
+    myOrders: pickLocaleText(locale, '我的订单', 'My Orders'),
+    refresh: pickLocaleText(locale, '刷新', 'Refresh'),
+    backToPay: pickLocaleText(locale, '返回充值', 'Back to Top Up'),
+    loading: pickLocaleText(locale, '加载中...', 'Loading...'),
+    userPrefix: pickLocaleText(locale, '用户', 'User'),
+    authError: pickLocaleText(locale, '缺少认证信息，请从 Sub2API 平台正确访问订单页面', 'Missing authentication information. Please open the orders page from Sub2API.'),
+  };
 
   const [isIframeContext, setIsIframeContext] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -56,9 +73,9 @@ function OrdersContent() {
     params.set('theme', theme);
     params.set('ui_mode', uiMode);
     params.set('tab', 'orders');
+    applyLocaleToSearchParams(params, locale);
     window.location.replace(`/pay?${params.toString()}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, isEmbedded]);
+  }, [isMobile, isEmbedded, token, theme, uiMode, locale]);
 
   const loadOrders = async (targetPage = page, targetPageSize = pageSize) => {
     setLoading(true);
@@ -66,7 +83,7 @@ function OrdersContent() {
     try {
       if (!hasToken) {
         setOrders([]);
-        setError('缺少认证信息，请从 Sub2API 平台正确访问订单页面。');
+        setError(text.authError);
         return;
       }
 
@@ -77,7 +94,7 @@ function OrdersContent() {
       });
       const res = await fetch(`/api/orders/my?${params}`);
       if (!res.ok) {
-        setError(res.status === 401 ? '登录态已失效，请从 Sub2API 重新进入支付页。' : '订单加载失败，请稍后重试。');
+        setError(res.status === 401 ? text.sessionExpired : text.loadFailed);
         setOrders([]);
         return;
       }
@@ -92,7 +109,7 @@ function OrdersContent() {
         username:
           (typeof meUser.displayName === 'string' && meUser.displayName.trim()) ||
           (typeof meUser.username === 'string' && meUser.username.trim()) ||
-          `用户 #${meId}`,
+          `${text.userPrefix} #${meId}`,
         balance: typeof meUser.balance === 'number' ? meUser.balance : 0,
       });
 
@@ -102,7 +119,7 @@ function OrdersContent() {
       setTotalPages(data.total_pages ?? 1);
     } catch {
       setOrders([]);
-      setError('网络错误，请稍后重试。');
+      setError(text.networkError);
     } finally {
       setLoading(false);
     }
@@ -111,7 +128,6 @@ function OrdersContent() {
   useEffect(() => {
     if (isMobile && !isEmbedded) return;
     loadOrders(1, pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, isMobile, isEmbedded]);
 
   const handlePageChange = (newPage: number) => {
@@ -139,7 +155,7 @@ function OrdersContent() {
       <div
         className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}
       >
-        正在切换到移动端订单 Tab...
+        {text.switchingMobileTab}
       </div>
     );
   }
@@ -148,8 +164,8 @@ function OrdersContent() {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
         <div className="text-center text-red-500">
-          <p className="text-lg font-medium">缺少认证信息</p>
-          <p className="mt-2 text-sm text-gray-500">请从 Sub2API 平台正确访问订单页面</p>
+          <p className="text-lg font-medium">{text.missingAuth}</p>
+          <p className="mt-2 text-sm text-gray-500">{text.visitOrders}</p>
         </div>
       </div>
     );
@@ -160,6 +176,7 @@ function OrdersContent() {
     if (token) params.set('token', token);
     params.set('theme', theme);
     params.set('ui_mode', uiMode);
+    applyLocaleToSearchParams(params, locale);
     return `${path}?${params.toString()}`;
   };
 
@@ -167,28 +184,28 @@ function OrdersContent() {
     <PayPageLayout
       isDark={isDark}
       isEmbedded={isEmbedded}
-      title="我的订单"
-      subtitle={userInfo?.username || '我的订单'}
+      title={text.myOrders}
+      subtitle={userInfo?.username || text.myOrders}
       actions={
         <>
           <button type="button" onClick={() => loadOrders(page, pageSize)} className={btnClass}>
-            刷新
+            {text.refresh}
           </button>
           {!srcHost && (
             <a href={buildScopedUrl('/pay')} className={btnClass}>
-              返回充值
+              {text.backToPay}
             </a>
           )}
         </>
       }
     >
-      <OrderSummaryCards isDark={isDark} summary={summary} />
+      <OrderSummaryCards isDark={isDark} locale={locale} summary={summary} />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <OrderFilterBar isDark={isDark} activeFilter={activeFilter} onChange={setActiveFilter} />
+        <OrderFilterBar isDark={isDark} locale={locale} activeFilter={activeFilter} onChange={setActiveFilter} />
       </div>
 
-      <OrderTable isDark={isDark} loading={loading} error={error} orders={filteredOrders} />
+      <OrderTable isDark={isDark} locale={locale} loading={loading} error={error} orders={filteredOrders} />
 
       <PaginationBar
         page={page}
@@ -196,6 +213,7 @@ function OrdersContent() {
         total={summary.total}
         pageSize={pageSize}
         pageSizeOptions={PAGE_SIZE_OPTIONS}
+        locale={locale}
         isDark={isDark}
         loading={loading}
         onPageChange={handlePageChange}
@@ -205,15 +223,20 @@ function OrdersContent() {
   );
 }
 
+function OrdersPageFallback() {
+  const searchParams = useSearchParams();
+  const locale = resolveLocale(searchParams.get('lang'));
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-gray-500">{pickLocaleText(locale, '加载中...', 'Loading...')}</div>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-gray-500">加载中...</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<OrdersPageFallback />}>
       <OrdersContent />
     </Suspense>
   );

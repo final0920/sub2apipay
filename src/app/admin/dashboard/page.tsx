@@ -7,6 +7,7 @@ import DashboardStats from '@/components/admin/DashboardStats';
 import DailyChart from '@/components/admin/DailyChart';
 import Leaderboard from '@/components/admin/Leaderboard';
 import PaymentMethodChart from '@/components/admin/PaymentMethodChart';
+import { resolveLocale, type Locale } from '@/lib/locale';
 
 interface DashboardData {
   summary: {
@@ -34,8 +35,37 @@ function DashboardContent() {
   const token = searchParams.get('token');
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
   const uiMode = searchParams.get('ui_mode') || 'standalone';
+  const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
   const isEmbedded = uiMode === 'embedded';
+
+  const text = locale === 'en'
+    ? {
+        missingToken: 'Missing admin token',
+        missingTokenHint: 'Please access the admin page from the Sub2API platform.',
+        invalidToken: 'Invalid admin token',
+        requestFailed: 'Request failed',
+        loadFailed: 'Failed to load data',
+        title: 'Dashboard',
+        subtitle: 'Recharge order analytics and insights',
+        daySuffix: 'd',
+        orders: 'Order Management',
+        refresh: 'Refresh',
+        loading: 'Loading...',
+      }
+    : {
+        missingToken: '缺少管理员凭证',
+        missingTokenHint: '请从 Sub2API 平台正确访问管理页面',
+        invalidToken: '管理员凭证无效',
+        requestFailed: '请求失败',
+        loadFailed: '加载数据失败',
+        title: '数据概览',
+        subtitle: '充值订单统计与分析',
+        daySuffix: '天',
+        orders: '订单管理',
+        refresh: '刷新',
+        loading: '加载中...',
+      };
 
   const [days, setDays] = useState<number>(30);
   const [data, setData] = useState<DashboardData | null>(null);
@@ -50,14 +80,14 @@ function DashboardContent() {
       const res = await fetch(`/api/admin/dashboard?token=${encodeURIComponent(token)}&days=${days}`);
       if (!res.ok) {
         if (res.status === 401) {
-          setError('管理员凭证无效');
+          setError(text.invalidToken);
           return;
         }
-        throw new Error('请求失败');
+        throw new Error(text.requestFailed);
       }
       setData(await res.json());
     } catch {
-      setError('加载数据失败');
+      setError(text.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -71,8 +101,8 @@ function DashboardContent() {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
         <div className="text-center text-red-500">
-          <p className="text-lg font-medium">缺少管理员凭证</p>
-          <p className="mt-2 text-sm text-gray-500">请从 Sub2API 平台正确访问管理页面</p>
+          <p className="text-lg font-medium">{text.missingToken}</p>
+          <p className="mt-2 text-sm text-gray-500">{text.missingTokenHint}</p>
         </div>
       </div>
     );
@@ -80,6 +110,7 @@ function DashboardContent() {
 
   const navParams = new URLSearchParams();
   navParams.set('token', token);
+  if (locale === 'en') navParams.set('lang', 'en');
   if (theme === 'dark') navParams.set('theme', 'dark');
   if (isEmbedded) navParams.set('ui_mode', 'embedded');
 
@@ -100,20 +131,21 @@ function DashboardContent() {
       isDark={isDark}
       isEmbedded={isEmbedded}
       maxWidth="full"
-      title="数据概览"
-      subtitle="充值订单统计与分析"
+      title={text.title}
+      subtitle={text.subtitle}
+      locale={locale}
       actions={
         <>
           {DAYS_OPTIONS.map((d) => (
             <button key={d} type="button" onClick={() => setDays(d)} className={days === d ? btnActive : btnBase}>
-              {d}天
+              {d}{text.daySuffix}
             </button>
           ))}
           <a href={`/admin?${navParams}`} className={btnBase}>
-            订单管理
+            {text.orders}
           </a>
           <button type="button" onClick={fetchData} className={btnBase}>
-            刷新
+            {text.refresh}
           </button>
         </>
       }
@@ -130,14 +162,14 @@ function DashboardContent() {
       )}
 
       {loading ? (
-        <div className={`py-24 text-center ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>加载中...</div>
+          <div className={`py-24 text-center ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.loading}</div>
       ) : data ? (
         <div className="space-y-6">
-          <DashboardStats summary={data.summary} dark={isDark} />
-          <DailyChart data={data.dailySeries} dark={isDark} />
+          <DashboardStats summary={data.summary} dark={isDark} locale={locale} />
+          <DailyChart data={data.dailySeries} dark={isDark} locale={locale} />
           <div className="grid gap-6 lg:grid-cols-2">
-            <Leaderboard data={data.leaderboard} dark={isDark} />
-            <PaymentMethodChart data={data.paymentMethods} dark={isDark} />
+            <Leaderboard data={data.leaderboard} dark={isDark} locale={locale} />
+            <PaymentMethodChart data={data.paymentMethods} dark={isDark} locale={locale} />
           </div>
         </div>
       ) : null}
@@ -145,14 +177,21 @@ function DashboardContent() {
   );
 }
 
+function DashboardPageFallback() {
+  const searchParams = useSearchParams();
+  const locale = resolveLocale(searchParams.get('lang'));
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-gray-500">{locale === 'en' ? 'Loading...' : '加载中...'}</div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-gray-500">加载中...</div>
-        </div>
-      }
+      fallback={<DashboardPageFallback />}
     >
       <DashboardContent />
     </Suspense>

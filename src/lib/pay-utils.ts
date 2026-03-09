@@ -4,6 +4,7 @@ import {
   PAYMENT_PREFIX,
   REDIRECT_PAYMENT_TYPES,
 } from './constants';
+import type { Locale } from './locale';
 
 export interface UserInfo {
   id?: number;
@@ -21,73 +22,90 @@ export interface MyOrder {
 
 export type OrderStatusFilter = 'ALL' | 'PENDING' | 'PAID' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
 
-export const STATUS_TEXT_MAP: Record<string, string> = {
-  [ORDER_STATUS.PENDING]: '待支付',
-  [ORDER_STATUS.PAID]: '已支付',
-  [ORDER_STATUS.RECHARGING]: '充值中',
-  [ORDER_STATUS.COMPLETED]: '已完成',
-  [ORDER_STATUS.EXPIRED]: '已超时',
-  [ORDER_STATUS.CANCELLED]: '已取消',
-  [ORDER_STATUS.FAILED]: '失败',
-  [ORDER_STATUS.REFUNDING]: '退款中',
-  [ORDER_STATUS.REFUNDED]: '已退款',
-  [ORDER_STATUS.REFUND_FAILED]: '退款失败',
+const STATUS_TEXT_MAP: Record<Locale, Record<string, string>> = {
+  zh: {
+    [ORDER_STATUS.PENDING]: '待支付',
+    [ORDER_STATUS.PAID]: '已支付',
+    [ORDER_STATUS.RECHARGING]: '充值中',
+    [ORDER_STATUS.COMPLETED]: '已完成',
+    [ORDER_STATUS.EXPIRED]: '已超时',
+    [ORDER_STATUS.CANCELLED]: '已取消',
+    [ORDER_STATUS.FAILED]: '失败',
+    [ORDER_STATUS.REFUNDING]: '退款中',
+    [ORDER_STATUS.REFUNDED]: '已退款',
+    [ORDER_STATUS.REFUND_FAILED]: '退款失败',
+  },
+  en: {
+    [ORDER_STATUS.PENDING]: 'Pending',
+    [ORDER_STATUS.PAID]: 'Paid',
+    [ORDER_STATUS.RECHARGING]: 'Recharging',
+    [ORDER_STATUS.COMPLETED]: 'Completed',
+    [ORDER_STATUS.EXPIRED]: 'Expired',
+    [ORDER_STATUS.CANCELLED]: 'Cancelled',
+    [ORDER_STATUS.FAILED]: 'Failed',
+    [ORDER_STATUS.REFUNDING]: 'Refunding',
+    [ORDER_STATUS.REFUNDED]: 'Refunded',
+    [ORDER_STATUS.REFUND_FAILED]: 'Refund failed',
+  },
 };
 
-export const FILTER_OPTIONS: { key: OrderStatusFilter; label: string }[] = [
-  { key: 'ALL', label: '全部' },
-  { key: 'PENDING', label: '待支付' },
-  { key: 'COMPLETED', label: '已完成' },
-  { key: 'CANCELLED', label: '已取消' },
-  { key: 'EXPIRED', label: '已超时' },
-];
+const FILTER_OPTIONS_MAP: Record<Locale, { key: OrderStatusFilter; label: string }[]> = {
+  zh: [
+    { key: 'ALL', label: '全部' },
+    { key: 'PENDING', label: '待支付' },
+    { key: 'COMPLETED', label: '已完成' },
+    { key: 'CANCELLED', label: '已取消' },
+    { key: 'EXPIRED', label: '已超时' },
+  ],
+  en: [
+    { key: 'ALL', label: 'All' },
+    { key: 'PENDING', label: 'Pending' },
+    { key: 'COMPLETED', label: 'Completed' },
+    { key: 'CANCELLED', label: 'Cancelled' },
+    { key: 'EXPIRED', label: 'Expired' },
+  ],
+};
+
+export function getFilterOptions(locale: Locale = 'zh'): { key: OrderStatusFilter; label: string }[] {
+  return FILTER_OPTIONS_MAP[locale];
+}
 
 export function detectDeviceIsMobile(): boolean {
   if (typeof window === 'undefined') return false;
 
-  // 1. 现代 API（Chromium 系浏览器，最准确）
   const uad = (navigator as Navigator & { userAgentData?: { mobile: boolean } }).userAgentData;
   if (uad !== undefined) return uad.mobile;
 
-  // 2. UA 正则兜底（Safari / Firefox 等）
   const ua = navigator.userAgent || '';
   const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Windows Phone|Mobile/i.test(ua);
   if (mobileUA) return true;
 
-  // 3. 触控 + 小屏兜底（新版 iPad UA 伪装成 Mac 的情况）
   const smallPhysicalScreen = Math.min(window.screen.width, window.screen.height) <= 768;
   const touchCapable = navigator.maxTouchPoints > 1;
   return touchCapable && smallPhysicalScreen;
 }
 
-export function formatStatus(status: string): string {
-  return STATUS_TEXT_MAP[status] || status;
+export function formatStatus(status: string, locale: Locale = 'zh'): string {
+  return STATUS_TEXT_MAP[locale][status] || status;
 }
 
-export function formatCreatedAt(value: string): string {
+export function formatCreatedAt(value: string, locale: Locale = 'zh'): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString(locale === 'en' ? 'en-US' : 'zh-CN');
 }
 
 export interface PaymentTypeMeta {
-  /** 支付渠道名（用户看到的：支付宝 / 微信支付 / Stripe） */
   label: string;
-  /** 选择器中的辅助说明（易支付 / 官方 / 信用卡 / 借记卡） */
   sublabel?: string;
-  /** 提供商名称（易支付 / 支付宝 / 微信支付 / Stripe） */
   provider: string;
   color: string;
   selectedBorder: string;
   selectedBg: string;
-  /** 暗色模式选中背景 */
   selectedBgDark: string;
   iconBg: string;
-  /** 图标路径（Stripe 不使用外部图标） */
   iconSrc?: string;
-  /** 图表条形颜色 class */
   chartBar: { light: string; dark: string };
-  /** 按钮颜色 class（含 hover/active 状态） */
   buttonClass: string;
 }
 
@@ -153,26 +171,51 @@ export const PAYMENT_TYPE_META: Record<string, PaymentTypeMeta> = {
   },
 };
 
-/** 获取支付方式的显示名称（如 '支付宝（易支付）'），用于管理后台等需要区分的场景 */
-export function getPaymentTypeLabel(type: string): string {
+const PAYMENT_TEXT_MAP: Record<Locale, Record<string, { label: string; provider: string; sublabel?: string }>> = {
+  zh: {
+    [PAYMENT_TYPE.ALIPAY]: { label: '支付宝', provider: '易支付' },
+    [PAYMENT_TYPE.ALIPAY_DIRECT]: { label: '支付宝', provider: '支付宝' },
+    [PAYMENT_TYPE.WXPAY]: { label: '微信支付', provider: '易支付' },
+    [PAYMENT_TYPE.WXPAY_DIRECT]: { label: '微信支付', provider: '微信支付' },
+    [PAYMENT_TYPE.STRIPE]: { label: 'Stripe', provider: 'Stripe' },
+  },
+  en: {
+    [PAYMENT_TYPE.ALIPAY]: { label: 'Alipay', provider: 'EasyPay' },
+    [PAYMENT_TYPE.ALIPAY_DIRECT]: { label: 'Alipay', provider: 'Alipay' },
+    [PAYMENT_TYPE.WXPAY]: { label: 'WeChat Pay', provider: 'EasyPay' },
+    [PAYMENT_TYPE.WXPAY_DIRECT]: { label: 'WeChat Pay', provider: 'WeChat Pay' },
+    [PAYMENT_TYPE.STRIPE]: { label: 'Stripe', provider: 'Stripe' },
+  },
+};
+
+function getPaymentText(type: string, locale: Locale = 'zh'): { label: string; provider: string; sublabel?: string } {
   const meta = PAYMENT_TYPE_META[type];
+  if (!meta) return { label: type, provider: '' };
+  const baseText = PAYMENT_TEXT_MAP[locale][type] || { label: meta.label, provider: meta.provider };
+  return {
+    ...baseText,
+    sublabel: meta.sublabel,
+  };
+}
+
+export function getPaymentTypeLabel(type: string, locale: Locale = 'zh'): string {
+  const meta = getPaymentText(type, locale);
   if (!meta) return type;
-  if (meta.sublabel) return `${meta.label}（${meta.sublabel}）`;
-  // 无 sublabel 时，检查是否有同名渠道需要用 provider 区分
-  const hasDuplicate = Object.entries(PAYMENT_TYPE_META).some(
-    ([k, m]) => k !== type && m.label === meta.label,
+  if (meta.sublabel) {
+    return locale === 'en' ? `${meta.label} (${meta.sublabel})` : `${meta.label}（${meta.sublabel}）`;
+  }
+  const hasDuplicate = Object.keys(PAYMENT_TYPE_META).some(
+    (key) => key !== type && getPaymentText(key, locale).label === meta.label,
   );
-  return hasDuplicate ? `${meta.label}（${meta.provider}）` : meta.label;
+  if (!hasDuplicate || !meta.provider) return meta.label;
+  return locale === 'en' ? `${meta.label} (${meta.provider})` : `${meta.label}（${meta.provider}）`;
 }
 
-/** 获取支付渠道和提供商的结构化信息 */
-export function getPaymentDisplayInfo(type: string): { channel: string; provider: string } {
-  const meta = PAYMENT_TYPE_META[type];
-  if (!meta) return { channel: type, provider: '' };
-  return { channel: meta.label, provider: meta.provider };
+export function getPaymentDisplayInfo(type: string, locale: Locale = 'zh'): { channel: string; provider: string; sublabel?: string } {
+  const meta = getPaymentText(type, locale);
+  return { channel: meta.label, provider: meta.provider, sublabel: meta.sublabel };
 }
 
-/** 获取基础支付方式图标类型（alipay_direct → alipay） */
 export function getPaymentIconType(type: string): string {
   if (type.startsWith(PAYMENT_PREFIX.ALIPAY)) return PAYMENT_PREFIX.ALIPAY;
   if (type.startsWith(PAYMENT_PREFIX.WXPAY)) return PAYMENT_PREFIX.WXPAY;
@@ -180,23 +223,19 @@ export function getPaymentIconType(type: string): string {
   return type;
 }
 
-/** 获取支付方式的元数据，带合理的 fallback */
 export function getPaymentMeta(type: string): PaymentTypeMeta {
   const base = getPaymentIconType(type);
   return PAYMENT_TYPE_META[type] || PAYMENT_TYPE_META[base] || PAYMENT_TYPE_META[PAYMENT_TYPE.ALIPAY];
 }
 
-/** 获取支付方式图标路径 */
 export function getPaymentIconSrc(type: string): string {
   return getPaymentMeta(type).iconSrc || '';
 }
 
-/** 获取支付方式简短标签（如 '支付宝'、'微信'、'Stripe'） */
-export function getPaymentChannelLabel(type: string): string {
-  return getPaymentMeta(type).label;
+export function getPaymentChannelLabel(type: string, locale: Locale = 'zh'): string {
+  return getPaymentDisplayInfo(type, locale).channel;
 }
 
-/** 支付类型谓词函数 */
 export function isStripeType(type: string | undefined | null): boolean {
   return !!type?.startsWith(PAYMENT_PREFIX.STRIPE);
 }
@@ -209,12 +248,10 @@ export function isAlipayType(type: string | undefined | null): boolean {
   return !!type?.startsWith(PAYMENT_PREFIX.ALIPAY);
 }
 
-/** 该支付方式需要页面跳转（而非二维码） */
 export function isRedirectPayment(type: string | undefined | null): boolean {
   return !!type && REDIRECT_PAYMENT_TYPES.has(type);
 }
 
-/** 用自定义 sublabel 覆盖默认值 */
 export function applySublabelOverrides(overrides: Record<string, string>): void {
   for (const [type, sublabel] of Object.entries(overrides)) {
     if (PAYMENT_TYPE_META[type]) {

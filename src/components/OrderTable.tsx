@@ -1,13 +1,34 @@
+import type { Locale } from '@/lib/locale';
 import { formatStatus, formatCreatedAt, getStatusBadgeClass, getPaymentDisplayInfo, type MyOrder } from '@/lib/pay-utils';
 
 interface OrderTableProps {
   isDark: boolean;
+  locale: Locale;
   loading: boolean;
   error: string;
   orders: MyOrder[];
 }
 
-export default function OrderTable({ isDark, loading, error, orders }: OrderTableProps) {
+export default function OrderTable({ isDark, locale, loading, error, orders }: OrderTableProps) {
+  const text =
+    locale === 'en'
+      ? {
+          empty: 'No matching orders found',
+          orderId: 'Order ID',
+          amount: 'Amount',
+          payment: 'Payment Method',
+          status: 'Status',
+          createdAt: 'Created At',
+        }
+      : {
+          empty: '暂无符合条件的订单记录',
+          orderId: '订单号',
+          amount: '金额',
+          payment: '支付方式',
+          status: '状态',
+          createdAt: '创建时间',
+        };
+
   return (
     <div
       className={[
@@ -40,7 +61,7 @@ export default function OrderTable({ isDark, loading, error, orders }: OrderTabl
             isDark ? 'border-slate-600 text-slate-400' : 'border-slate-300 text-slate-500',
           ].join(' ')}
         >
-          暂无符合条件的订单记录
+          {text.empty}
         </div>
       ) : (
         <>
@@ -50,11 +71,11 @@ export default function OrderTable({ isDark, loading, error, orders }: OrderTabl
               isDark ? 'text-slate-300' : 'text-slate-600',
             ].join(' ')}
           >
-            <span>订单号</span>
-            <span>金额</span>
-            <span>支付方式</span>
-            <span>状态</span>
-            <span>创建时间</span>
+            <span>{text.orderId}</span>
+            <span>{text.amount}</span>
+            <span>{text.payment}</span>
+            <span>{text.status}</span>
+            <span>{text.createdAt}</span>
           </div>
           <div className="space-y-2 md:space-y-0">
             {orders.map((order) => (
@@ -67,19 +88,17 @@ export default function OrderTable({ isDark, loading, error, orders }: OrderTabl
               >
                 <div className="font-medium">#{order.id.slice(0, 12)}</div>
                 <div className="font-semibold">¥{order.amount.toFixed(2)}</div>
-                <div>
-                  {getPaymentDisplayInfo(order.paymentType).channel}
-                </div>
+                <div>{getPaymentDisplayInfo(order.paymentType, locale).channel}</div>
                 <div>
                   <span
                     className={['rounded-full px-2 py-0.5 text-xs', getStatusBadgeClass(order.status, isDark)].join(
                       ' ',
                     )}
                   >
-                    {formatStatus(order.status)}
+                    {formatStatus(order.status, locale)}
                   </span>
                 </div>
-                <div className={isDark ? 'text-slate-300' : 'text-slate-600'}>{formatCreatedAt(order.createdAt)}</div>
+                <div className={isDark ? 'text-slate-300' : 'text-slate-600'}>{formatCreatedAt(order.createdAt, locale)}</div>
               </div>
             ))}
           </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { PAYMENT_TYPE_META, getPaymentIconType, getPaymentMeta } from '@/lib/pay-utils';
+import type { Locale } from '@/lib/locale';
+import { PAYMENT_TYPE_META, getPaymentIconType, getPaymentMeta, getPaymentDisplayInfo } from '@/lib/pay-utils';
 
 export interface MethodLimitInfo {
   available: boolean;
@@ -25,6 +26,7 @@ interface PaymentFormProps {
   dark?: boolean;
   pendingBlocked?: boolean;
   pendingCount?: number;
+  locale?: Locale;
 }
 
 const QUICK_AMOUNTS = [10, 20, 50, 100, 200, 500, 1000, 2000];
@@ -47,12 +49,12 @@ export default function PaymentForm({
   dark = false,
   pendingBlocked = false,
   pendingCount = 0,
+  locale = 'zh',
 }: PaymentFormProps) {
   const [amount, setAmount] = useState<number | ''>('');
   const [paymentType, setPaymentType] = useState(enabledPaymentTypes[0] || 'alipay');
   const [customAmount, setCustomAmount] = useState('');
 
-  // Reset paymentType when enabledPaymentTypes changes (e.g. after config loads)
   const effectivePaymentType = enabledPaymentTypes.includes(paymentType)
     ? paymentType
     : enabledPaymentTypes[0] || 'stripe';
@@ -107,7 +109,7 @@ export default function PaymentForm({
     if (iconType === 'alipay') {
       return (
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#00AEEF] text-xl font-bold leading-none text-white">
-          支
+          {locale === 'en' ? 'A' : '支'}
         </span>
       );
     }
@@ -144,7 +146,6 @@ export default function PaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* User Info */}
       <div
         className={[
           'rounded-xl border p-4',
@@ -152,22 +153,22 @@ export default function PaymentForm({
         ].join(' ')}
       >
         <div className={['text-xs uppercase tracking-wide', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-          充值账户
+          {locale === 'en' ? 'Recharge Account' : '充值账户'}
         </div>
         <div className={['mt-1 text-base font-medium', dark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
-          {userName || `用户 #${userId}`}
+          {userName || (locale === 'en' ? `User #${userId}` : `用户 #${userId}`)}
         </div>
         {userBalance !== undefined && (
           <div className={['mt-1 text-sm', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-            当前余额: <span className="font-medium text-green-600">{userBalance.toFixed(2)}</span>
+            {locale === 'en' ? 'Current Balance:' : '当前余额:'}{' '}
+            <span className="font-medium text-green-600">{userBalance.toFixed(2)}</span>
           </div>
         )}
       </div>
 
-      {/* Quick Amount Selection */}
       <div>
         <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-          充值金额
+          {locale === 'en' ? 'Recharge Amount' : '充值金额'}
         </label>
         <div className="grid grid-cols-3 gap-2">
           {QUICK_AMOUNTS.filter((val) => val >= minAmount && val <= effectiveMax).map((val) => (
@@ -189,10 +190,9 @@ export default function PaymentForm({
         </div>
       </div>
 
-      {/* Custom Amount */}
       <div>
         <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-slate-700'].join(' ')}>
-          自定义金额
+          {locale === 'en' ? 'Custom Amount' : '自定义金额'}
         </label>
         <div className="relative">
           <span
@@ -223,23 +223,25 @@ export default function PaymentForm({
         !isValid &&
         (() => {
           const num = parseFloat(customAmount);
-          let msg = '金额需在范围内，且最多支持 2 位小数（精确到分）';
+          let msg = locale === 'en'
+            ? 'Amount must be within range and support up to 2 decimal places'
+            : '金额需在范围内，且最多支持 2 位小数（精确到分）';
           if (!isNaN(num)) {
-            if (num < minAmount) msg = `单笔最低充值 ¥${minAmount}`;
-            else if (num > effectiveMax) msg = `单笔最高充值 ¥${effectiveMax}`;
+            if (num < minAmount) msg = locale === 'en' ? `Minimum per transaction: ¥${minAmount}` : `单笔最低充值 ¥${minAmount}`;
+            else if (num > effectiveMax) msg = locale === 'en' ? `Maximum per transaction: ¥${effectiveMax}` : `单笔最高充值 ¥${effectiveMax}`;
           }
           return <div className={['text-xs', dark ? 'text-amber-300' : 'text-amber-700'].join(' ')}>{msg}</div>;
         })()}
 
-      {/* Payment Type — only show when multiple types available */}
       {enabledPaymentTypes.length > 1 && (
         <div>
           <label className={['mb-2 block text-sm font-medium', dark ? 'text-slate-200' : 'text-gray-700'].join(' ')}>
-            支付方式
+            {locale === 'en' ? 'Payment Method' : '支付方式'}
           </label>
           <div className="grid grid-cols-2 gap-3 sm:flex">
             {enabledPaymentTypes.map((type) => {
               const meta = PAYMENT_TYPE_META[type];
+              const displayInfo = getPaymentDisplayInfo(type, locale);
               const isSelected = effectivePaymentType === type;
               const limitInfo = methodLimits?.[type];
               const isUnavailable = limitInfo !== undefined && !limitInfo.available;
@@ -250,7 +252,7 @@ export default function PaymentForm({
                   type="button"
                   disabled={isUnavailable}
                   onClick={() => !isUnavailable && setPaymentType(type)}
-                  title={isUnavailable ? '今日充值额度已满，请使用其他支付方式' : undefined}
+                  title={isUnavailable ? (locale === 'en' ? 'Daily limit reached, please use another payment method' : '今日充值额度已满，请使用其他支付方式') : undefined}
                   className={[
                     'relative flex h-[58px] flex-col items-center justify-center rounded-lg border px-3 transition-all sm:flex-1',
                     isUnavailable
@@ -267,14 +269,14 @@ export default function PaymentForm({
                   <span className="flex items-center gap-2">
                     {renderPaymentIcon(type)}
                     <span className="flex flex-col items-start leading-none">
-                      <span className="text-xl font-semibold tracking-tight">{meta?.label || type}</span>
+                      <span className="text-xl font-semibold tracking-tight">{displayInfo.channel || type}</span>
                       {isUnavailable ? (
-                        <span className="text-[10px] tracking-wide text-red-400">今日额度已满</span>
-                      ) : meta?.sublabel ? (
+                        <span className="text-[10px] tracking-wide text-red-400">{locale === 'en' ? 'Daily limit reached' : '今日额度已满'}</span>
+                      ) : displayInfo.sublabel ? (
                         <span
                           className={`text-[10px] tracking-wide ${dark ? (isSelected ? 'text-slate-300' : 'text-slate-400') : 'text-slate-600'}`}
                         >
-                          {meta.sublabel}
+                          {displayInfo.sublabel}
                         </span>
                       ) : null}
                     </span>
@@ -284,20 +286,20 @@ export default function PaymentForm({
             })}
           </div>
 
-          {/* 当前选中渠道额度不足时的提示 */}
           {(() => {
             const limitInfo = methodLimits?.[effectivePaymentType];
             if (!limitInfo || limitInfo.available) return null;
             return (
               <p className={['mt-2 text-xs', dark ? 'text-amber-300' : 'text-amber-600'].join(' ')}>
-                所选支付方式今日额度已满，请切换到其他支付方式
+                {locale === 'en'
+                  ? 'The selected payment method has reached today\'s limit. Please switch to another method.'
+                  : '所选支付方式今日额度已满，请切换到其他支付方式'}
               </p>
             );
           })()}
         </div>
       )}
 
-      {/* Fee Detail */}
       {feeRate > 0 && selectedAmount > 0 && (
         <div
           className={[
@@ -306,26 +308,25 @@ export default function PaymentForm({
           ].join(' ')}
         >
           <div className="flex items-center justify-between">
-            <span>充值金额</span>
+            <span>{locale === 'en' ? 'Recharge Amount' : '充值金额'}</span>
             <span>¥{selectedAmount.toFixed(2)}</span>
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span>手续费（{feeRate}%）</span>
+          <div className="mt-1 flex items-center justify-between">
+            <span>{locale === 'en' ? `Fee (${feeRate}%)` : `手续费（${feeRate}%）`}</span>
             <span>¥{feeAmount.toFixed(2)}</span>
           </div>
           <div
             className={[
-              'flex items-center justify-between mt-1.5 pt-1.5 border-t font-medium',
+              'mt-1.5 flex items-center justify-between border-t pt-1.5 font-medium',
               dark ? 'border-slate-700 text-slate-100' : 'border-slate-200 text-slate-900',
             ].join(' ')}
           >
-            <span>实付金额</span>
+            <span>{locale === 'en' ? 'Amount to Pay' : '实付金额'}</span>
             <span>¥{payAmount.toFixed(2)}</span>
           </div>
         </div>
       )}
 
-      {/* Pending order limit warning */}
       {pendingBlocked && (
         <div
           className={[
@@ -335,11 +336,12 @@ export default function PaymentForm({
               : 'border-amber-200 bg-amber-50 text-amber-700',
           ].join(' ')}
         >
-          您有 {pendingCount} 个待支付订单，请先完成或取消后再充值
+          {locale === 'en'
+            ? `You have ${pendingCount} pending orders. Please complete or cancel them before recharging.`
+            : `您有 ${pendingCount} 个待支付订单，请先完成或取消后再充值`}
         </div>
       )}
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={!isValid || loading || pendingBlocked}
@@ -352,10 +354,16 @@ export default function PaymentForm({
         }`}
       >
         {loading
-          ? '处理中...'
+          ? locale === 'en'
+            ? 'Processing...'
+            : '处理中...'
           : pendingBlocked
-            ? '待支付订单过多'
-            : `立即充值 ¥${(feeRate > 0 && selectedAmount > 0 ? payAmount : selectedAmount || 0).toFixed(2)}`}
+            ? locale === 'en'
+              ? 'Too many pending orders'
+              : '待支付订单过多'
+            : locale === 'en'
+              ? `Recharge Now ¥${(feeRate > 0 && selectedAmount > 0 ? payAmount : selectedAmount || 0).toFixed(2)}`
+              : `立即充值 ¥${(feeRate > 0 && selectedAmount > 0 ? payAmount : selectedAmount || 0).toFixed(2)}`}
       </button>
     </form>
   );

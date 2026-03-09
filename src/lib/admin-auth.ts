@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnv } from '@/lib/config';
 import crypto from 'crypto';
+import { resolveLocale } from '@/lib/locale';
 
 function isLocalAdminToken(token: string): boolean {
   const env = getEnv();
@@ -56,6 +57,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<boolean> {
   return isSub2ApiAdmin(token);
 }
 
-export function unauthorizedResponse() {
-  return NextResponse.json({ error: '未授权' }, { status: 401 });
+export function unauthorizedResponse(request?: NextRequest) {
+  const locale = resolveLocale(request?.nextUrl.searchParams.get('lang'));
+  return NextResponse.json({ error: locale === 'en' ? 'Unauthorized' : '未授权' }, { status: 401 });
 }

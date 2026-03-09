@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, useCallback, Suspense } from 'react';
+import { applyLocaleToSearchParams, pickLocaleText, resolveLocale } from '@/lib/locale';
 import { getPaymentMeta } from '@/lib/pay-utils';
 
 function StripePopupContent() {
@@ -10,10 +11,24 @@ function StripePopupContent() {
   const amount = parseFloat(searchParams.get('amount') || '0') || 0;
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
   const method = searchParams.get('method') || '';
+  const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
   const isAlipay = method === 'alipay';
 
-  // Sensitive data received via postMessage from parent, NOT from URL
+  const text = {
+    init: pickLocaleText(locale, '正在初始化...', 'Initializing...'),
+    orderId: pickLocaleText(locale, '订单号', 'Order ID'),
+    loadFailed: pickLocaleText(locale, '支付组件加载失败，请关闭窗口重试', 'Failed to load payment component. Please close the window and try again.'),
+    payFailed: pickLocaleText(locale, '支付失败，请重试', 'Payment failed. Please try again.'),
+    closeWindow: pickLocaleText(locale, '关闭窗口', 'Close window'),
+    redirecting: pickLocaleText(locale, '正在跳转到支付页面...', 'Redirecting to payment page...'),
+    loadingForm: pickLocaleText(locale, '正在加载支付表单...', 'Loading payment form...'),
+    successClosing: pickLocaleText(locale, '支付成功，窗口即将自动关闭...', 'Payment successful. This window will close automatically...'),
+    closeWindowManually: pickLocaleText(locale, '手动关闭窗口', 'Close window manually'),
+    processing: pickLocaleText(locale, '处理中...', 'Processing...'),
+    payAmount: pickLocaleText(locale, `支付 ¥${amount.toFixed(2)}`, `Pay ¥${amount.toFixed(2)}`),
+  };
+
   const [credentials, setCredentials] = useState<{
     clientSecret: string;
     publishableKey: string;
@@ -34,10 +49,11 @@ function StripePopupContent() {
     returnUrl.searchParams.set('order_id', orderId);
     returnUrl.searchParams.set('status', 'success');
     returnUrl.searchParams.set('popup', '1');
+    returnUrl.searchParams.set('theme', theme);
+    applyLocaleToSearchParams(returnUrl.searchParams, locale);
     return returnUrl.toString();
-  }, [orderId]);
+  }, [orderId, theme, locale]);
 
-  // Listen for credentials from parent window via postMessage
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
@@ -48,14 +64,12 @@ function StripePopupContent() {
       }
     };
     window.addEventListener('message', handler);
-    // Signal parent that popup is ready to receive data
     if (window.opener) {
       window.opener.postMessage({ type: 'STRIPE_POPUP_READY' }, window.location.origin);
     }
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  // Initialize Stripe once credentials are received
   useEffect(() => {
     if (!credentials) return;
     let cancelled = false;
@@ -65,14 +79,13 @@ function StripePopupContent() {
       loadStripe(publishableKey).then((stripe) => {
         if (cancelled || !stripe) {
           if (!cancelled) {
-            setStripeError('支付组件加载失败，请关闭窗口重试');
+            setStripeError(text.loadFailed);
             setStripeLoaded(true);
           }
           return;
         }
 
         if (isAlipay) {
-          // Alipay: confirm directly and redirect, no Payment Element needed
           stripe
             .confirmAlipayPayment(clientSecret, {
               return_url: buildReturnUrl(),
@@ -80,15 +93,13 @@ function StripePopupContent() {
             .then((result) => {
               if (cancelled) return;
               if (result.error) {
-                setStripeError(result.error.message || '支付失败，请重试');
+                setStripeError(result.error.message || text.payFailed);
                 setStripeLoaded(true);
               }
-              // If no error, the page has already been redirected
             });
           return;
         }
 
-        // Fallback: create Elements for Payment Element flow
         const elements = stripe.elements({
           clientSecret,
           appearance: {
@@ -103,9 +114,8 @@ function StripePopupContent() {
     return () => {
       cancelled = true;
     };
-  }, [credentials, isDark, isAlipay, buildReturnUrl]);
+  }, [credentials, isDark, isAlipay, buildReturnUrl, text.loadFailed, text.payFailed]);
 
-  // Mount Payment Element (only for non-alipay methods)
   const stripeContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node || !stripeLib) return;
@@ -135,7 +145,7 @@ function StripePopupContent() {
     });
 
     if (error) {
-      setStripeError(error.message || '支付失败，请重试');
+      setStripeError(error.message || text.payFailed);
       setStripeSubmitting(false);
     } else {
       setStripeSuccess(true);
@@ -143,7 +153,6 @@ function StripePopupContent() {
     }
   };
 
-  // Auto-close after success
   useEffect(() => {
     if (!stripeSuccess) return;
     const timer = setTimeout(() => {
@@ -152,7 +161,6 @@ function StripePopupContent() {
     return () => clearTimeout(timer);
   }, [stripeSuccess]);
 
-  // Waiting for credentials from parent
   if (!credentials) {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
@@ -161,14 +169,13 @@ function StripePopupContent() {
         >
           <div className="flex items-center justify-center py-8">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#635bff] border-t-transparent" />
-            <span className={`ml-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>正在初始化...</span>
+            <span className={`ml-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.init}</span>
           </div>
         </div>
       </div>
     );
   }
 
-  // Alipay direct confirm: show loading/redirecting state
   if (isAlipay) {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
@@ -180,7 +187,7 @@ function StripePopupContent() {
               {'¥'}
               {amount.toFixed(2)}
             </div>
-            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>订单号: {orderId}</p>
+            <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.orderId}: {orderId}</p>
           </div>
           {stripeError ? (
             <div className="space-y-3">
@@ -190,14 +197,14 @@ function StripePopupContent() {
                 onClick={() => window.close()}
                 className="w-full text-sm text-blue-600 underline hover:text-blue-700"
               >
-                关闭窗口
+                {text.closeWindow}
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#635bff] border-t-transparent" />
               <span className={`ml-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-                正在跳转到支付页面...
+                {text.redirecting}
               </span>
             </div>
           )}
@@ -216,26 +223,26 @@ function StripePopupContent() {
             {'¥'}
             {amount.toFixed(2)}
           </div>
-          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>订单号: {orderId}</p>
+          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.orderId}: {orderId}</p>
         </div>
 
         {!stripeLoaded ? (
           <div className="flex items-center justify-center py-8">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#635bff] border-t-transparent" />
-            <span className={`ml-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>正在加载支付表单...</span>
+            <span className={`ml-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.loadingForm}</span>
           </div>
         ) : stripeSuccess ? (
           <div className="py-6 text-center">
             <div className="text-5xl text-green-600">{'✓'}</div>
             <p className={`mt-3 text-sm ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>
-              支付成功，窗口即将自动关闭...
+              {text.successClosing}
             </p>
             <button
               type="button"
               onClick={() => window.close()}
               className="mt-4 text-sm text-blue-600 underline hover:text-blue-700"
             >
-              手动关闭窗口
+              {text.closeWindowManually}
             </button>
           </div>
         ) : (
@@ -261,10 +268,10 @@ function StripePopupContent() {
               {stripeSubmitting ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  处理中...
+                  {text.processing}
                 </span>
               ) : (
-                `支付 ¥${amount.toFixed(2)}`
+                text.payAmount
               )}
             </button>
           </>
@@ -274,15 +281,20 @@ function StripePopupContent() {
   );
 }
 
+function StripePopupFallback() {
+  const searchParams = useSearchParams();
+  const locale = resolveLocale(searchParams.get('lang'));
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-gray-500">{pickLocaleText(locale, '加载中...', 'Loading...')}</div>
+    </div>
+  );
+}
+
 export default function StripePopupPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-gray-500">加载中...</div>
-        </div>
-      }
-    >
+    <Suspense fallback={<StripePopupFallback />}>
       <StripePopupContent />
     </Suspense>
   );

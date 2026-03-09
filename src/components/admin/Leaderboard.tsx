@@ -1,5 +1,7 @@
 'use client';
 
+import type { Locale } from '@/lib/locale';
+
 interface LeaderboardEntry {
   userId: number;
   userName: string | null;
@@ -11,6 +13,7 @@ interface LeaderboardEntry {
 interface LeaderboardProps {
   data: LeaderboardEntry[];
   dark?: boolean;
+  locale?: Locale;
 }
 
 const RANK_STYLES: Record<number, { light: string; dark: string }> = {
@@ -19,7 +22,13 @@ const RANK_STYLES: Record<number, { light: string; dark: string }> = {
   3: { light: 'bg-orange-100 text-orange-700', dark: 'bg-orange-500/20 text-orange-300' },
 };
 
-export default function Leaderboard({ data, dark }: LeaderboardProps) {
+export default function Leaderboard({ data, dark, locale = 'zh' }: LeaderboardProps) {
+  const title = locale === 'en' ? 'Recharge Leaderboard (Top 10)' : '充值排行榜 (Top 10)';
+  const emptyText = locale === 'en' ? 'No data' : '暂无数据';
+  const userLabel = locale === 'en' ? 'User' : '用户';
+  const amountLabel = locale === 'en' ? 'Total Amount' : '累计金额';
+  const orderCountLabel = locale === 'en' ? 'Orders' : '订单数';
+  const currency = locale === 'en' ? '$' : '¥';
   const thCls = `px-4 py-3 text-left text-xs font-medium uppercase ${dark ? 'text-slate-400' : 'text-gray-500'}`;
   const tdCls = `whitespace-nowrap px-4 py-3 text-sm ${dark ? 'text-slate-300' : 'text-slate-700'}`;
   const tdMuted = `whitespace-nowrap px-4 py-3 text-sm ${dark ? 'text-slate-400' : 'text-gray-500'}`;
@@ -33,9 +42,9 @@ export default function Leaderboard({ data, dark }: LeaderboardProps) {
         ].join(' ')}
       >
         <h3 className={['mb-4 text-sm font-semibold', dark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-          充值排行榜 (Top 10)
+          {title}
         </h3>
-        <p className={['text-center text-sm py-8', dark ? 'text-slate-500' : 'text-gray-400'].join(' ')}>暂无数据</p>
+        <p className={['text-center text-sm py-8', dark ? 'text-slate-500' : 'text-gray-400'].join(' ')}>{emptyText}</p>
       </div>
     );
   }
@@ -48,16 +57,16 @@ export default function Leaderboard({ data, dark }: LeaderboardProps) {
       ].join(' ')}
     >
       <h3 className={['px-6 pt-5 pb-2 text-sm font-semibold', dark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-        充值排行榜 (Top 10)
+        {title}
       </h3>
       <div className="overflow-x-auto">
         <table className={`min-w-full divide-y ${dark ? 'divide-slate-700' : 'divide-gray-200'}`}>
           <thead className={dark ? 'bg-slate-800/50' : 'bg-gray-50'}>
             <tr>
               <th className={thCls}>#</th>
-              <th className={thCls}>用户</th>
-              <th className={thCls}>累计金额</th>
-              <th className={thCls}>订单数</th>
+              <th className={thCls}>{userLabel}</th>
+              <th className={thCls}>{amountLabel}</th>
+              <th className={thCls}>{orderCountLabel}</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${dark ? 'divide-slate-700/60' : 'divide-gray-200'}`}>
@@ -88,7 +97,7 @@ export default function Leaderboard({ data, dark }: LeaderboardProps) {
                   <td
                     className={`whitespace-nowrap px-4 py-3 text-sm font-medium ${dark ? 'text-slate-200' : 'text-slate-900'}`}
                   >
-                    ¥{entry.totalAmount.toLocaleString()}
+                    {currency}{entry.totalAmount.toLocaleString()}
                   </td>
                   <td className={tdMuted}>{entry.orderCount}</td>
                 </tr>

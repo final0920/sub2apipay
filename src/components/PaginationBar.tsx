@@ -1,9 +1,12 @@
+import type { Locale } from '@/lib/locale';
+
 interface PaginationBarProps {
   page: number;
   totalPages: number;
   total: number;
   pageSize: number;
   pageSizeOptions?: number[];
+  locale?: Locale;
   isDark?: boolean;
   loading?: boolean;
   onPageChange: (newPage: number) => void;
@@ -16,6 +19,7 @@ export default function PaginationBar({
   total,
   pageSize,
   pageSizeOptions = [20, 50, 100],
+  locale,
   isDark = false,
   loading = false,
   onPageChange,
@@ -30,17 +34,29 @@ export default function PaginationBar({
         : 'border-slate-300 text-slate-600 hover:bg-slate-100',
     ].join(' ');
 
+  const text =
+    locale === 'en'
+      ? {
+          total: `Total ${total}${totalPages > 1 ? `, Page ${page} / ${totalPages}` : ''}`,
+          perPage: 'Per page',
+          previous: 'Previous',
+          next: 'Next',
+        }
+      : {
+          total: `共 ${total} 条${totalPages > 1 ? `，第 ${page} / ${totalPages} 页` : ''}`,
+          perPage: '每页',
+          previous: '上一页',
+          next: '下一页',
+        };
+
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-      {/* 左侧：统计 + 每页大小 */}
       <div className="flex items-center gap-2">
-        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-          共 {total} 条{totalPages > 1 && `，第 ${page} / ${totalPages} 页`}
-        </span>
+        <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{text.total}</span>
 
         {onPageSizeChange && (
           <>
-            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>每页</span>
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{text.perPage}</span>
             {pageSizeOptions.map((s) => (
               <button
                 key={s}
@@ -68,7 +84,6 @@ export default function PaginationBar({
         )}
       </div>
 
-      {/* 右侧：分页导航 */}
       {totalPages > 1 && (
         <div className="flex items-center gap-1.5">
           <button
@@ -85,7 +100,7 @@ export default function PaginationBar({
             onClick={() => onPageChange(page - 1)}
             className={navBtnClass(page <= 1)}
           >
-            上一页
+            {text.previous}
           </button>
           <button
             type="button"
@@ -93,7 +108,7 @@ export default function PaginationBar({
             onClick={() => onPageChange(page + 1)}
             className={navBtnClass(page >= totalPages)}
           >
-            下一页
+            {text.next}
           </button>
           <button
             type="button"

@@ -1,5 +1,7 @@
 'use client';
 
+import type { Locale } from '@/lib/locale';
+
 interface Summary {
   today: { amount: number; orderCount: number; paidCount: number };
   total: { amount: number; orderCount: number; paidCount: number };
@@ -10,16 +12,18 @@ interface Summary {
 interface DashboardStatsProps {
   summary: Summary;
   dark?: boolean;
+  locale?: Locale;
 }
 
-export default function DashboardStats({ summary, dark }: DashboardStatsProps) {
+export default function DashboardStats({ summary, dark, locale = 'zh' }: DashboardStatsProps) {
+  const currency = locale === 'en' ? '$' : '¥';
   const cards = [
-    { label: '今日充值', value: `¥${summary.today.amount.toLocaleString()}`, accent: true },
-    { label: '今日订单', value: `${summary.today.paidCount}/${summary.today.orderCount}` },
-    { label: '累计充值', value: `¥${summary.total.amount.toLocaleString()}`, accent: true },
-    { label: '累计订单', value: String(summary.total.paidCount) },
-    { label: '成功率', value: `${summary.successRate}%` },
-    { label: '平均充值', value: `¥${summary.avgAmount.toFixed(2)}` },
+    { label: locale === 'en' ? 'Today Recharge' : '今日充值', value: `${currency}${summary.today.amount.toLocaleString()}`, accent: true },
+    { label: locale === 'en' ? 'Today Orders' : '今日订单', value: `${summary.today.paidCount}/${summary.today.orderCount}` },
+    { label: locale === 'en' ? 'Total Recharge' : '累计充值', value: `${currency}${summary.total.amount.toLocaleString()}`, accent: true },
+    { label: locale === 'en' ? 'Paid Orders' : '累计订单', value: String(summary.total.paidCount) },
+    { label: locale === 'en' ? 'Success Rate' : '成功率', value: `${summary.successRate}%` },
+    { label: locale === 'en' ? 'Average Amount' : '平均充值', value: `${currency}${summary.avgAmount.toFixed(2)}` },
   ];
 
   return (

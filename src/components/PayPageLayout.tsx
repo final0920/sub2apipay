@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Locale } from '@/lib/locale';
 
 interface PayPageLayoutProps {
   isDark: boolean;
@@ -8,6 +9,7 @@ interface PayPageLayoutProps {
   subtitle: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  locale?: Locale;
 }
 
 export default function PayPageLayout({
@@ -18,6 +20,7 @@ export default function PayPageLayout({
   subtitle,
   actions,
   children,
+  locale = 'zh',
 }: PayPageLayoutProps) {
   const maxWidthClass = maxWidth === 'sm' ? 'max-w-lg' : maxWidth === 'lg' ? 'max-w-6xl' : '';
 
@@ -64,7 +67,7 @@ export default function PayPageLayout({
                 isDark ? 'bg-indigo-500/20 text-indigo-200' : 'bg-indigo-50 text-indigo-700',
               ].join(' ')}
             >
-              Sub2API Secure Pay
+              {locale === 'en' ? 'Sub2API Secure Pay' : 'Sub2API 安全支付'}
             </div>
             <h1
               className={['text-2xl font-semibold tracking-tight', isDark ? 'text-slate-100' : 'text-slate-900'].join(

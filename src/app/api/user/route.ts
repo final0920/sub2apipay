@@ -3,17 +3,19 @@ import { getUser, getCurrentUserByToken } from '@/lib/sub2api/client';
 import { getEnv } from '@/lib/config';
 import { queryMethodLimits } from '@/lib/order/limits';
 import { initPaymentProviders, paymentRegistry } from '@/lib/payment';
-import { PAYMENT_TYPE_META } from '@/lib/pay-utils';
+import { getPaymentDisplayInfo } from '@/lib/pay-utils';
+import { resolveLocale } from '@/lib/locale';
 
 export async function GET(request: NextRequest) {
+  const locale = resolveLocale(request.nextUrl.searchParams.get('lang'));
   const userId = Number(request.nextUrl.searchParams.get('user_id'));
   if (!userId || isNaN(userId) || userId <= 0) {
-    return NextResponse.json({ error: '无效的用户 ID' }, { status: 400 });
+    return NextResponse.json({ error: locale === 'en' ? 'Invalid user ID' : '无效的用户 ID' }, { status: 400 });
   }
 
   const token = request.nextUrl.searchParams.get('token')?.trim();
   if (!token) {
-    return NextResponse.json({ error: '缺少 token 参数' }, { status: 401 });
+    return NextResponse.json({ error: locale === 'en' ? 'Missing token parameter' : '缺少 token 参数' }, { status: 401 });
   }
 
   try {
@@ -22,11 +24,11 @@ export async function GET(request: NextRequest) {
     try {
       tokenUser = await getCurrentUserByToken(token);
     } catch {
-      return NextResponse.json({ error: '无效的 token' }, { status: 401 });
+      return NextResponse.json({ error: locale === 'en' ? 'Invalid token' : '无效的 token' }, { status: 401 });
     }
 
     if (tokenUser.id !== userId) {
-      return NextResponse.json({ error: '无权访问该用户信息' }, { status: 403 });
+      return NextResponse.json({ error: locale === 'en' ? 'Forbidden to access this user' : '无权访问该用户信息' }, { status: 403 });
     }
 
     const env = getEnv();
@@ -40,17 +42,16 @@ export async function GET(request: NextRequest) {
     // 1. 检测同 label 冲突：多个启用渠道有相同的显示名，自动标记默认 sublabel（provider 名）
     const labelCount = new Map<string, string[]>();
     for (const type of enabledTypes) {
-      const meta = PAYMENT_TYPE_META[type];
-      if (!meta) continue;
-      const types = labelCount.get(meta.label) || [];
+      const { channel } = getPaymentDisplayInfo(type, locale);
+      const types = labelCount.get(channel) || [];
       types.push(type);
-      labelCount.set(meta.label, types);
+      labelCount.set(channel, types);
     }
     for (const [, types] of labelCount) {
       if (types.length > 1) {
         for (const type of types) {
-          const meta = PAYMENT_TYPE_META[type];
-          if (meta) sublabelOverrides[type] = meta.provider;
+          const { provider } = getPaymentDisplayInfo(type, locale);
+          if (provider) sublabelOverrides[type] = provider;
         }
       }
     }
@@ -85,9 +86,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === 'USER_NOT_FOUND') {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+      return NextResponse.json({ error: locale === 'en' ? 'User not found' : '用户不存在' }, { status: 404 });
     }
     console.error('Get user error:', error);
-    return NextResponse.json({ error: '获取用户信息失败' }, { status: 500 });
+    return NextResponse.json({ error: locale === 'en' ? 'Failed to fetch user info' : '获取用户信息失败' }, { status: 500 });
   }
 }

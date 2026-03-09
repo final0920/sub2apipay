@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import OrderFilterBar from '@/components/OrderFilterBar';
+import type { Locale } from '@/lib/locale';
 import {
   formatStatus,
   formatCreatedAt,
@@ -19,6 +20,7 @@ interface MobileOrderListProps {
   loadingMore: boolean;
   onRefresh: () => void;
   onLoadMore: () => void;
+  locale?: Locale;
 }
 
 export default function MobileOrderList({
@@ -29,6 +31,7 @@ export default function MobileOrderList({
   loadingMore,
   onRefresh,
   onLoadMore,
+  locale = 'zh',
 }: MobileOrderListProps) {
   const [activeFilter, setActiveFilter] = useState<OrderStatusFilter>('ALL');
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -59,7 +62,7 @@ export default function MobileOrderList({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className={['text-base font-semibold', isDark ? 'text-slate-100' : 'text-slate-900'].join(' ')}>
-          我的订单
+          {locale === 'en' ? 'My Orders' : '我的订单'}
         </h3>
         <button
           type="button"
@@ -71,11 +74,11 @@ export default function MobileOrderList({
               : 'border-slate-300 text-slate-700 hover:bg-slate-100',
           ].join(' ')}
         >
-          刷新
+          {locale === 'en' ? 'Refresh' : '刷新'}
         </button>
       </div>
 
-      <OrderFilterBar isDark={isDark} activeFilter={activeFilter} onChange={setActiveFilter} />
+      <OrderFilterBar isDark={isDark} locale={locale} activeFilter={activeFilter} onChange={setActiveFilter} />
 
       {!hasToken ? (
         <div
@@ -84,7 +87,9 @@ export default function MobileOrderList({
             isDark ? 'border-amber-500/40 text-amber-200' : 'border-amber-300 text-amber-700',
           ].join(' ')}
         >
-          当前链接未携带登录 token，无法查询"我的订单"。
+          {locale === 'en'
+            ? 'The current link does not include a login token, so "My Orders" is unavailable.'
+            : '当前链接未携带登录 token，无法查询"我的订单"。'}
         </div>
       ) : filteredOrders.length === 0 ? (
         <div
@@ -93,7 +98,7 @@ export default function MobileOrderList({
             isDark ? 'border-slate-600 text-slate-400' : 'border-slate-300 text-slate-500',
           ].join(' ')}
         >
-          暂无符合条件的订单记录
+          {locale === 'en' ? 'No matching orders found' : '暂无符合条件的订单记录'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -110,26 +115,27 @@ export default function MobileOrderList({
                 <span
                   className={['rounded-full px-2 py-0.5 text-xs', getStatusBadgeClass(order.status, isDark)].join(' ')}
                 >
-                  {formatStatus(order.status)}
+                  {formatStatus(order.status, locale)}
                 </span>
               </div>
               <div className={['mt-1 text-sm', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
-                {getPaymentDisplayInfo(order.paymentType).channel}
+                {getPaymentDisplayInfo(order.paymentType, locale).channel}
               </div>
               <div className={['mt-0.5 text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
-                {formatCreatedAt(order.createdAt)}
+                {formatCreatedAt(order.createdAt, locale)}
               </div>
             </div>
           ))}
 
-          {/* 无限滚动哨兵 */}
           {hasMore && (
             <div ref={sentinelRef} className="py-3 text-center">
               {loadingMore ? (
-                <span className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>加载中...</span>
+                <span className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                  {locale === 'en' ? 'Loading...' : '加载中...'}
+                </span>
               ) : (
                 <span className={['text-xs', isDark ? 'text-slate-600' : 'text-slate-300'].join(' ')}>
-                  上滑加载更多
+                  {locale === 'en' ? 'Scroll up to load more' : '上滑加载更多'}
                 </span>
               )}
             </div>
@@ -137,7 +143,7 @@ export default function MobileOrderList({
 
           {!hasMore && orders.length > 0 && (
             <div className={['py-2 text-center text-xs', isDark ? 'text-slate-600' : 'text-slate-400'].join(' ')}>
-              已显示全部订单
+              {locale === 'en' ? 'All orders loaded' : '已显示全部订单'}
             </div>
           )}
         </div>

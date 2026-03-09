@@ -9,8 +9,13 @@ import type { PaymentType, PaymentNotification } from '@/lib/payment';
 import { getUser, createAndRedeem, subtractBalance, addBalance } from '@/lib/sub2api/client';
 import { Prisma } from '@prisma/client';
 import { deriveOrderState, isRefundStatus } from './status';
+import { pickLocaleText, type Locale } from '@/lib/locale';
 
 const MAX_PENDING_ORDERS = 3;
+
+function message(locale: Locale, zh: string, en: string): string {
+  return pickLocaleText(locale, zh, en);
+}
 
 export interface CreateOrderInput {
   userId: number;
@@ -20,6 +25,7 @@ export interface CreateOrderInput {
   isMobile?: boolean;
   srcHost?: string;
   srcUrl?: string;
+  locale?: Locale;
 }
 
 export interface CreateOrderResult {
@@ -39,17 +45,22 @@ export interface CreateOrderResult {
 
 export async function createOrder(input: CreateOrderInput): Promise<CreateOrderResult> {
   const env = getEnv();
+  const locale = input.locale ?? 'zh';
 
   const user = await getUser(input.userId);
   if (user.status !== 'active') {
-    throw new OrderError('USER_INACTIVE', 'User account is disabled', 422);
+    throw new OrderError('USER_INACTIVE', message(locale, '用户账号已被禁用', 'User account is disabled'), 422);
   }
 
   const pendingCount = await prisma.order.count({
     where: { userId: input.userId, status: ORDER_STATUS.PENDING },
   });
   if (pendingCount >= MAX_PENDING_ORDERS) {
-    throw new OrderError('TOO_MANY_PENDING', `Too many pending orders (${MAX_PENDING_ORDERS})`, 429);
+    throw new OrderError(
+      'TOO_MANY_PENDING',
+      message(locale, `待支付订单过多（最多 ${MAX_PENDING_ORDERS} 笔）`, `Too many pending orders (${MAX_PENDING_ORDERS})`),
+      429,
+    );
   }
 
   // 每日累计充值限额校验（0 = 不限制）
@@ -67,7 +78,15 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const alreadyPaid = Number(dailyAgg._sum.amount ?? 0);
     if (alreadyPaid + input.amount > env.MAX_DAILY_RECHARGE_AMOUNT) {
       const remaining = Math.max(0, env.MAX_DAILY_RECHARGE_AMOUNT - alreadyPaid);
-      throw new OrderError('DAILY_LIMIT_EXCEEDED', `今日累计充值已达上限，剩余可充值 ${remaining.toFixed(2)} 元`, 429);
+      throw new OrderError(
+        'DAILY_LIMIT_EXCEEDED',
+        message(
+          locale,
+          `今日累计充值已达上限，剩余可充值 ${remaining.toFixed(2)} 元`,
+          `Daily recharge limit reached. Remaining amount: ${remaining.toFixed(2)} CNY`,
+        ),
+        429,
+      );
     }
   }
 
@@ -90,8 +109,16 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
       throw new OrderError(
         'METHOD_DAILY_LIMIT_EXCEEDED',
         remaining > 0
-          ? `${input.paymentType} 今日剩余额度 ${remaining.toFixed(2)} 元，请减少充值金额或使用其他支付方式`
-          : `${input.paymentType} 今日充值额度已满，请使用其他支付方式`,
+          ? message(
+              locale,
+              `${input.paymentType} 今日剩余额度 ${remaining.toFixed(2)} 元，请减少充值金额或使用其他支付方式`,
+              `${input.paymentType} remaining daily quota: ${remaining.toFixed(2)} CNY. Reduce the amount or use another payment method`,
+            )
+          : message(
+              locale,
+              `${input.paymentType} 今日充值额度已满，请使用其他支付方式`,
+              `${input.paymentType} daily quota is full. Please use another payment method`,
+            ),
         429,
       );
     }
@@ -195,9 +222,17 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`Payment gateway error (${input.paymentType}):`, error);
     if (msg.includes('environment variables') || msg.includes('not configured') || msg.includes('not found')) {
-      throw new OrderError('PAYMENT_GATEWAY_ERROR', `支付渠道（${input.paymentType}）暂未配置，请联系管理员`, 503);
+      throw new OrderError(
+        'PAYMENT_GATEWAY_ERROR',
+        message(locale, `支付渠道（${input.paymentType}）暂未配置，请联系管理员`, `Payment method (${input.paymentType}) is not configured. Please contact the administrator`),
+        503,
+      );
     }
-    throw new OrderError('PAYMENT_GATEWAY_ERROR', '支付渠道暂时不可用，请稍后重试或更换支付方式', 502);
+    throw new OrderError(
+      'PAYMENT_GATEWAY_ERROR',
+      message(locale, '支付渠道暂时不可用，请稍后重试或更换支付方式', 'Payment method is temporarily unavailable. Please try again later or use another payment method'),
+      502,
+    );
   }
 }
 
@@ -268,15 +303,16 @@ export async function cancelOrderCore(options: {
   return 'cancelled';
 }
 
-export async function cancelOrder(orderId: string, userId: number): Promise<CancelOutcome> {
+export async function cancelOrder(orderId: string, userId: number, locale: Locale = 'zh'): Promise<CancelOutcome> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: { id: true, userId: true, status: true, paymentTradeNo: true, paymentType: true },
   });
 
-  if (!order) throw new OrderError('NOT_FOUND', 'Order not found', 404);
-  if (order.userId !== userId) throw new OrderError('FORBIDDEN', 'Forbidden', 403);
-  if (order.status !== ORDER_STATUS.PENDING) throw new OrderError('INVALID_STATUS', 'Order cannot be cancelled', 400);
+  if (!order) throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
+  if (order.userId !== userId) throw new OrderError('FORBIDDEN', message(locale, '无权操作该订单', 'Forbidden'), 403);
+  if (order.status !== ORDER_STATUS.PENDING)
+    throw new OrderError('INVALID_STATUS', message(locale, '订单当前状态不可取消', 'Order cannot be cancelled'), 400);
 
   return cancelOrderCore({
     orderId: order.id,
@@ -284,18 +320,19 @@ export async function cancelOrder(orderId: string, userId: number): Promise<Canc
     paymentType: order.paymentType,
     finalStatus: ORDER_STATUS.CANCELLED,
     operator: `user:${userId}`,
-    auditDetail: 'User cancelled order',
+    auditDetail: message(locale, '用户取消订单', 'User cancelled order'),
   });
 }
 
-export async function adminCancelOrder(orderId: string): Promise<CancelOutcome> {
+export async function adminCancelOrder(orderId: string, locale: Locale = 'zh'): Promise<CancelOutcome> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: { id: true, status: true, paymentTradeNo: true, paymentType: true },
   });
 
-  if (!order) throw new OrderError('NOT_FOUND', 'Order not found', 404);
-  if (order.status !== ORDER_STATUS.PENDING) throw new OrderError('INVALID_STATUS', 'Order cannot be cancelled', 400);
+  if (!order) throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
+  if (order.status !== ORDER_STATUS.PENDING)
+    throw new OrderError('INVALID_STATUS', message(locale, '订单当前状态不可取消', 'Order cannot be cancelled'), 400);
 
   return cancelOrderCore({
     orderId: order.id,
@@ -303,7 +340,7 @@ export async function adminCancelOrder(orderId: string): Promise<CancelOutcome> 
     paymentType: order.paymentType,
     finalStatus: ORDER_STATUS.CANCELLED,
     operator: 'admin',
-    auditDetail: 'Admin cancelled order',
+    auditDetail: message(locale, '管理员取消订单', 'Admin cancelled order'),
   });
 }
 
@@ -531,13 +568,13 @@ export async function executeRecharge(orderId: string): Promise<void> {
   }
 }
 
-function assertRetryAllowed(order: { status: string; paidAt: Date | null }): void {
+function assertRetryAllowed(order: { status: string; paidAt: Date | null }, locale: Locale): void {
   if (!order.paidAt) {
-    throw new OrderError('INVALID_STATUS', 'Order is not paid, retry denied', 400);
+    throw new OrderError('INVALID_STATUS', message(locale, '订单未支付，不允许重试', 'Order is not paid, retry denied'), 400);
   }
 
   if (isRefundStatus(order.status)) {
-    throw new OrderError('INVALID_STATUS', 'Refund-related order cannot retry', 400);
+    throw new OrderError('INVALID_STATUS', message(locale, '退款相关订单不允许重试', 'Refund-related order cannot retry'), 400);
   }
 
   if (order.status === ORDER_STATUS.FAILED || order.status === ORDER_STATUS.PAID) {
@@ -545,17 +582,17 @@ function assertRetryAllowed(order: { status: string; paidAt: Date | null }): voi
   }
 
   if (order.status === ORDER_STATUS.RECHARGING) {
-    throw new OrderError('CONFLICT', 'Order is recharging, retry later', 409);
+    throw new OrderError('CONFLICT', message(locale, '订单正在充值中，请稍后重试', 'Order is recharging, retry later'), 409);
   }
 
   if (order.status === ORDER_STATUS.COMPLETED) {
-    throw new OrderError('INVALID_STATUS', 'Order already completed', 400);
+    throw new OrderError('INVALID_STATUS', message(locale, '订单已完成', 'Order already completed'), 400);
   }
 
-  throw new OrderError('INVALID_STATUS', 'Only paid and failed orders can retry', 400);
+  throw new OrderError('INVALID_STATUS', message(locale, '仅已支付和失败订单允许重试', 'Only paid and failed orders can retry'), 400);
 }
 
-export async function retryRecharge(orderId: string): Promise<void> {
+export async function retryRecharge(orderId: string, locale: Locale = 'zh'): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: {
@@ -567,10 +604,10 @@ export async function retryRecharge(orderId: string): Promise<void> {
   });
 
   if (!order) {
-    throw new OrderError('NOT_FOUND', 'Order not found', 404);
+    throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
   }
 
-  assertRetryAllowed(order);
+  assertRetryAllowed(order, locale);
 
   const result = await prisma.order.updateMany({
     where: {
@@ -592,30 +629,30 @@ export async function retryRecharge(orderId: string): Promise<void> {
     });
 
     if (!latest) {
-      throw new OrderError('NOT_FOUND', 'Order not found', 404);
+      throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
     }
 
     const derived = deriveOrderState(latest);
     if (derived.rechargeStatus === 'recharging' || latest.status === ORDER_STATUS.PAID) {
-      throw new OrderError('CONFLICT', 'Order is recharging, retry later', 409);
+      throw new OrderError('CONFLICT', message(locale, '订单正在充值中，请稍后重试', 'Order is recharging, retry later'), 409);
     }
 
     if (derived.rechargeStatus === 'success') {
-      throw new OrderError('INVALID_STATUS', 'Order already completed', 400);
+      throw new OrderError('INVALID_STATUS', message(locale, '订单已完成', 'Order already completed'), 400);
     }
 
     if (isRefundStatus(latest.status)) {
-      throw new OrderError('INVALID_STATUS', 'Refund-related order cannot retry', 400);
+      throw new OrderError('INVALID_STATUS', message(locale, '退款相关订单不允许重试', 'Refund-related order cannot retry'), 400);
     }
 
-    throw new OrderError('CONFLICT', 'Order status changed, refresh and retry', 409);
+    throw new OrderError('CONFLICT', message(locale, '订单状态已变更，请刷新后重试', 'Order status changed, refresh and retry'), 409);
   }
 
   await prisma.auditLog.create({
     data: {
       orderId,
       action: 'RECHARGE_RETRY',
-      detail: 'Admin manual retry recharge',
+      detail: message(locale, '管理员手动重试充值', 'Admin manual retry recharge'),
       operator: 'admin',
     },
   });
@@ -627,6 +664,7 @@ export interface RefundInput {
   orderId: string;
   reason?: string;
   force?: boolean;
+  locale?: Locale;
 }
 
 export interface RefundResult {
@@ -636,10 +674,11 @@ export interface RefundResult {
 }
 
 export async function processRefund(input: RefundInput): Promise<RefundResult> {
+  const locale = input.locale ?? 'zh';
   const order = await prisma.order.findUnique({ where: { id: input.orderId } });
-  if (!order) throw new OrderError('NOT_FOUND', 'Order not found', 404);
+  if (!order) throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
   if (order.status !== ORDER_STATUS.COMPLETED) {
-    throw new OrderError('INVALID_STATUS', 'Only completed orders can be refunded', 400);
+    throw new OrderError('INVALID_STATUS', message(locale, '仅已完成订单允许退款', 'Only completed orders can be refunded'), 400);
   }
 
   const rechargeAmount = Number(order.amount);
@@ -651,14 +690,18 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
       if (user.balance < rechargeAmount) {
         return {
           success: false,
-          warning: `User balance ${user.balance} is lower than refund ${rechargeAmount}`,
+          warning: message(
+            locale,
+            `用户余额 ${user.balance} 小于需退款的充值金额 ${rechargeAmount}`,
+            `User balance ${user.balance} is lower than refund ${rechargeAmount}`,
+          ),
           requireForce: true,
         };
       }
     } catch {
       return {
         success: false,
-        warning: 'Cannot fetch user balance, use force=true',
+        warning: message(locale, '无法获取用户余额，请使用 force=true', 'Cannot fetch user balance, use force=true'),
         requireForce: true,
       };
     }
@@ -669,7 +712,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
     data: { status: ORDER_STATUS.REFUNDING },
   });
   if (lockResult.count === 0) {
-    throw new OrderError('CONFLICT', 'Order status changed, refresh and retry', 409);
+    throw new OrderError('CONFLICT', message(locale, '订单状态已变更，请刷新后重试', 'Order status changed, refresh and retry'), 409);
   }
 
   try {

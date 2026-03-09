@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { getPaymentDisplayInfo } from '@/lib/pay-utils';
+import { getPaymentDisplayInfo, formatCreatedAt } from '@/lib/pay-utils';
+import type { Locale } from '@/lib/locale';
 
 interface AuditLog {
   id: string;
@@ -43,9 +44,83 @@ interface OrderDetailProps {
   };
   onClose: () => void;
   dark?: boolean;
+  locale?: Locale;
 }
 
-export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) {
+export default function OrderDetail({ order, onClose, dark, locale = 'zh' }: OrderDetailProps) {
+  const currency = locale === 'en' ? '$' : '¥';
+  const text = locale === 'en'
+    ? {
+        title: 'Order Details',
+        auditLogs: 'Audit Logs',
+        operator: 'Operator',
+        emptyLogs: 'No logs',
+        close: 'Close',
+        yes: 'Yes',
+        no: 'No',
+        orderId: 'Order ID',
+        userId: 'User ID',
+        userName: 'Username',
+        email: 'Email',
+        amount: 'Amount',
+        status: 'Status',
+        paymentSuccess: 'Payment Success',
+        rechargeSuccess: 'Recharge Success',
+        rechargeStatus: 'Recharge Status',
+        paymentChannel: 'Payment Channel',
+        provider: 'Provider',
+        rechargeCode: 'Recharge Code',
+        paymentTradeNo: 'Payment Trade No.',
+        clientIp: 'Client IP',
+        sourceHost: 'Source Host',
+        sourcePage: 'Source Page',
+        createdAt: 'Created At',
+        expiresAt: 'Expires At',
+        paidAt: 'Paid At',
+        completedAt: 'Completed At',
+        failedAt: 'Failed At',
+        failedReason: 'Failure Reason',
+        refundAmount: 'Refund Amount',
+        refundReason: 'Refund Reason',
+        refundAt: 'Refunded At',
+        forceRefund: 'Force Refund',
+      }
+    : {
+        title: '订单详情',
+        auditLogs: '审计日志',
+        operator: '操作者',
+        emptyLogs: '暂无日志',
+        close: '关闭',
+        yes: '是',
+        no: '否',
+        orderId: '订单号',
+        userId: '用户ID',
+        userName: '用户名',
+        email: '邮箱',
+        amount: '金额',
+        status: '状态',
+        paymentSuccess: '支付成功',
+        rechargeSuccess: '充值成功',
+        rechargeStatus: '充值状态',
+        paymentChannel: '支付渠道',
+        provider: '提供商',
+        rechargeCode: '充值码',
+        paymentTradeNo: '支付单号',
+        clientIp: '客户端IP',
+        sourceHost: '来源域名',
+        sourcePage: '来源页面',
+        createdAt: '创建时间',
+        expiresAt: '过期时间',
+        paidAt: '支付时间',
+        completedAt: '完成时间',
+        failedAt: '失败时间',
+        failedReason: '失败原因',
+        refundAmount: '退款金额',
+        refundReason: '退款原因',
+        refundAt: '退款时间',
+        forceRefund: '强制退款',
+      };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -54,37 +129,39 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  const paymentInfo = getPaymentDisplayInfo(order.paymentType, locale);
+
   const fields = [
-    { label: '订单号', value: order.id },
-    { label: '用户ID', value: order.userId },
-    { label: '用户名', value: order.userName || '-' },
-    { label: '邮箱', value: order.userEmail || '-' },
-    { label: '金额', value: `¥${order.amount.toFixed(2)}` },
-    { label: '状态', value: order.status },
-    { label: '支付成功', value: order.paymentSuccess ? 'yes' : 'no' },
-    { label: '充值成功', value: order.rechargeSuccess ? 'yes' : 'no' },
-    { label: '充值状态', value: order.rechargeStatus || '-' },
-    { label: '支付渠道', value: getPaymentDisplayInfo(order.paymentType).channel },
-    { label: '提供商', value: getPaymentDisplayInfo(order.paymentType).provider || '-' },
-    { label: '充值码', value: order.rechargeCode },
-    { label: '支付单号', value: order.paymentTradeNo || '-' },
-    { label: '客户端IP', value: order.clientIp || '-' },
-    { label: '来源域名', value: order.srcHost || '-' },
-    { label: '来源页面', value: order.srcUrl || '-' },
-    { label: '创建时间', value: new Date(order.createdAt).toLocaleString('zh-CN') },
-    { label: '过期时间', value: new Date(order.expiresAt).toLocaleString('zh-CN') },
-    { label: '支付时间', value: order.paidAt ? new Date(order.paidAt).toLocaleString('zh-CN') : '-' },
-    { label: '完成时间', value: order.completedAt ? new Date(order.completedAt).toLocaleString('zh-CN') : '-' },
-    { label: '失败时间', value: order.failedAt ? new Date(order.failedAt).toLocaleString('zh-CN') : '-' },
-    { label: '失败原因', value: order.failedReason || '-' },
+    { label: text.orderId, value: order.id },
+    { label: text.userId, value: order.userId },
+    { label: text.userName, value: order.userName || '-' },
+    { label: text.email, value: order.userEmail || '-' },
+    { label: text.amount, value: `${currency}${order.amount.toFixed(2)}` },
+    { label: text.status, value: order.status },
+    { label: text.paymentSuccess, value: order.paymentSuccess ? text.yes : text.no },
+    { label: text.rechargeSuccess, value: order.rechargeSuccess ? text.yes : text.no },
+    { label: text.rechargeStatus, value: order.rechargeStatus || '-' },
+    { label: text.paymentChannel, value: paymentInfo.channel },
+    { label: text.provider, value: paymentInfo.provider || '-' },
+    { label: text.rechargeCode, value: order.rechargeCode },
+    { label: text.paymentTradeNo, value: order.paymentTradeNo || '-' },
+    { label: text.clientIp, value: order.clientIp || '-' },
+    { label: text.sourceHost, value: order.srcHost || '-' },
+    { label: text.sourcePage, value: order.srcUrl || '-' },
+    { label: text.createdAt, value: formatCreatedAt(order.createdAt, locale) },
+    { label: text.expiresAt, value: formatCreatedAt(order.expiresAt, locale) },
+    { label: text.paidAt, value: order.paidAt ? formatCreatedAt(order.paidAt, locale) : '-' },
+    { label: text.completedAt, value: order.completedAt ? formatCreatedAt(order.completedAt, locale) : '-' },
+    { label: text.failedAt, value: order.failedAt ? formatCreatedAt(order.failedAt, locale) : '-' },
+    { label: text.failedReason, value: order.failedReason || '-' },
   ];
 
   if (order.refundAmount) {
     fields.push(
-      { label: '退款金额', value: `¥${order.refundAmount.toFixed(2)}` },
-      { label: '退款原因', value: order.refundReason || '-' },
-      { label: '退款时间', value: order.refundAt ? new Date(order.refundAt).toLocaleString('zh-CN') : '-' },
-      { label: '强制退款', value: order.forceRefund ? '是' : '否' },
+      { label: text.refundAmount, value: `${currency}${order.refundAmount.toFixed(2)}` },
+      { label: text.refundReason, value: order.refundReason || '-' },
+      { label: text.refundAt, value: order.refundAt ? formatCreatedAt(order.refundAt, locale) : '-' },
+      { label: text.forceRefund, value: order.forceRefund ? text.yes : text.no },
     );
   }
 
@@ -95,7 +172,7 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">订单详情</h3>
+          <h3 className="text-lg font-bold">{text.title}</h3>
           <button
             onClick={onClose}
             className={dark ? 'text-slate-400 hover:text-slate-200' : 'text-gray-400 hover:text-gray-600'}
@@ -115,7 +192,7 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
 
         {/* Audit Logs */}
         <div className="mt-6">
-          <h4 className={`mb-3 font-medium ${dark ? 'text-slate-100' : 'text-gray-900'}`}>审计日志</h4>
+          <h4 className={`mb-3 font-medium ${dark ? 'text-slate-100' : 'text-gray-900'}`}>{text.auditLogs}</h4>
           <div className="space-y-2">
             {order.auditLogs.map((log) => (
               <div
@@ -125,7 +202,7 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{log.action}</span>
                   <span className={`text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>
-                    {new Date(log.createdAt).toLocaleString('zh-CN')}
+                    {formatCreatedAt(log.createdAt, locale)}
                   </span>
                 </div>
                 {log.detail && (
@@ -135,13 +212,13 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
                 )}
                 {log.operator && (
                   <div className={`mt-1 text-xs ${dark ? 'text-slate-500' : 'text-gray-400'}`}>
-                    操作者: {log.operator}
+                    {text.operator}: {log.operator}
                   </div>
                 )}
               </div>
             ))}
             {order.auditLogs.length === 0 && (
-              <div className={`text-center text-sm ${dark ? 'text-slate-500' : 'text-gray-400'}`}>暂无日志</div>
+              <div className={`text-center text-sm ${dark ? 'text-slate-500' : 'text-gray-400'}`}>{text.emptyLogs}</div>
             )}
           </div>
         </div>
@@ -150,7 +227,7 @@ export default function OrderDetail({ order, onClose, dark }: OrderDetailProps) 
           onClick={onClose}
           className={`mt-6 w-full rounded-lg border py-2 text-sm ${dark ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
         >
-          关闭
+          {text.close}
         </button>
       </div>
     </div>

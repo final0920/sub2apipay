@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
+import type { Locale } from '@/lib/locale';
 import {
   isStripeType,
   getPaymentMeta,
@@ -26,15 +27,8 @@ interface PaymentQRCodeProps {
   dark?: boolean;
   isEmbedded?: boolean;
   isMobile?: boolean;
+  locale?: Locale;
 }
-
-const TEXT_EXPIRED = '订单已超时';
-const TEXT_REMAINING = '剩余支付时间';
-const TEXT_GO_PAY = '点击前往支付';
-const TEXT_SCAN_PAY = '请使用支付应用扫码支付';
-const TEXT_BACK = '返回';
-const TEXT_CANCEL_ORDER = '取消订单';
-const TEXT_H5_HINT = '支付完成后请返回此页面，系统将自动确认';
 
 export default function PaymentQRCode({
   orderId,
@@ -52,6 +46,7 @@ export default function PaymentQRCode({
   dark = false,
   isEmbedded = false,
   isMobile = false,
+  locale = 'zh',
 }: PaymentQRCodeProps) {
   const displayAmount = payAmountProp ?? amount;
   const hasFeeDiff = payAmountProp !== undefined && payAmountProp !== amount;
@@ -63,7 +58,6 @@ export default function PaymentQRCode({
   const [cancelBlocked, setCancelBlocked] = useState(false);
   const [redirected, setRedirected] = useState(false);
 
-  // Stripe Payment Element state
   const [stripeLoaded, setStripeLoaded] = useState(false);
   const [stripeSubmitting, setStripeSubmitting] = useState(false);
   const [stripeError, setStripeError] = useState('');
@@ -72,12 +66,41 @@ export default function PaymentQRCode({
     stripe: import('@stripe/stripe-js').Stripe;
     elements: import('@stripe/stripe-js').StripeElements;
   } | null>(null);
-  // Track selected payment method in Payment Element (for embedded popup decision)
   const [stripePaymentMethod, setStripePaymentMethod] = useState('card');
   const [popupBlocked, setPopupBlocked] = useState(false);
   const paymentMethodListenerAdded = useRef(false);
 
-  // PC 端有二维码时优先展示二维码；仅移动端或无二维码时才跳转
+  const t = {
+    expired: locale === 'en' ? 'Order Expired' : '订单已超时',
+    remaining: locale === 'en' ? 'Time Remaining' : '剩余支付时间',
+    scanPay: locale === 'en' ? 'Please scan with your payment app' : '请使用支付应用扫码支付',
+    back: locale === 'en' ? 'Back' : '返回',
+    cancelOrder: locale === 'en' ? 'Cancel Order' : '取消订单',
+    h5Hint: locale === 'en' ? 'After payment, please return to this page. The system will confirm automatically.' : '支付完成后请返回此页面，系统将自动确认',
+    paid: locale === 'en' ? 'Order Paid' : '订单已支付',
+    paidCancelBlocked:
+      locale === 'en' ? 'This order has already been paid and cannot be cancelled. The recharge will be credited automatically.' : '该订单已支付完成，无法取消。充值将自动到账。',
+    backToRecharge: locale === 'en' ? 'Back to Recharge' : '返回充值',
+    credited: locale === 'en' ? 'Credited ¥' : '到账 ¥',
+    stripeLoadFailed: locale === 'en' ? 'Failed to load payment component. Please refresh and try again.' : '支付组件加载失败，请刷新页面重试',
+    initFailed: locale === 'en' ? 'Payment initialization failed. Please go back and try again.' : '支付初始化失败，请返回重试',
+    loadingForm: locale === 'en' ? 'Loading payment form...' : '正在加载支付表单...',
+    payFailed: locale === 'en' ? 'Payment failed. Please try again.' : '支付失败，请重试',
+    successProcessing: locale === 'en' ? 'Payment successful, processing your order...' : '支付成功，正在处理订单...',
+    processing: locale === 'en' ? 'Processing...' : '处理中...',
+    payNow: locale === 'en' ? 'Pay' : '支付',
+    popupBlocked:
+      locale === 'en' ? 'Popup was blocked by your browser. Please allow popups for this site and try again.' : '弹出窗口被浏览器拦截，请允许本站弹出窗口后重试',
+    redirectingPrefix: locale === 'en' ? 'Redirecting to ' : '正在跳转到',
+    redirectingSuffix: locale === 'en' ? '...' : '...',
+    notRedirectedPrefix: locale === 'en' ? 'Not redirected? Open ' : '未跳转？点击前往',
+    goPaySuffix: locale === 'en' ? '' : '',
+    gotoPrefix: locale === 'en' ? 'Open ' : '前往',
+    gotoSuffix: locale === 'en' ? ' to pay' : '支付',
+    openScanPrefix: locale === 'en' ? 'Open ' : '请打开',
+    openScanSuffix: locale === 'en' ? ' and scan to complete payment' : '扫一扫完成支付',
+  };
+
   const shouldAutoRedirect = !expired && !isStripeType(paymentType) && !!payUrl && (isMobile || !qrCode);
 
   useEffect(() => {
@@ -128,7 +151,6 @@ export default function PaymentQRCode({
     };
   }, [qrPayload]);
 
-  // Initialize Stripe Payment Element
   const isStripe = isStripeType(paymentType);
 
   useEffect(() => {
@@ -139,7 +161,7 @@ export default function PaymentQRCode({
       loadStripe(stripePublishableKey).then((stripe) => {
         if (cancelled) return;
         if (!stripe) {
-          setStripeError('支付组件加载失败，请刷新页面重试');
+          setStripeError(t.stripeLoadFailed);
           setStripeLoaded(true);
           return;
         }
@@ -160,9 +182,8 @@ export default function PaymentQRCode({
     return () => {
       cancelled = true;
     };
-  }, [isStripe, clientSecret, stripePublishableKey, dark]);
+  }, [isStripe, clientSecret, stripePublishableKey, dark, t.stripeLoadFailed]);
 
-  // Mount Payment Element when container is available
   const stripeContainerRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node || !stripeLib) return;
@@ -188,7 +209,6 @@ export default function PaymentQRCode({
   const handleStripeSubmit = async () => {
     if (!stripeLib || stripeSubmitting) return;
 
-    // In embedded mode, Alipay redirects to a page with X-Frame-Options that breaks iframe
     if (isEmbedded && stripePaymentMethod === 'alipay') {
       handleOpenPopup();
       return;
@@ -203,6 +223,9 @@ export default function PaymentQRCode({
     returnUrl.search = '';
     returnUrl.searchParams.set('order_id', orderId);
     returnUrl.searchParams.set('status', 'success');
+    if (locale === 'en') {
+      returnUrl.searchParams.set('lang', 'en');
+    }
 
     const { error } = await stripe.confirmPayment({
       elements,
@@ -213,20 +236,17 @@ export default function PaymentQRCode({
     });
 
     if (error) {
-      setStripeError(error.message || '支付失败，请重试');
+      setStripeError(error.message || t.payFailed);
       setStripeSubmitting(false);
     } else {
-      // Payment succeeded (or no redirect needed)
       setStripeSuccess(true);
       setStripeSubmitting(false);
-      // Polling will pick up the status change
     }
   };
 
   const handleOpenPopup = () => {
     if (!clientSecret || !stripePublishableKey) return;
     setPopupBlocked(false);
-    // Only pass display params in URL — sensitive data sent via postMessage
     const popupUrl = new URL(window.location.href);
     popupUrl.pathname = '/pay/stripe-popup';
     popupUrl.search = '';
@@ -234,13 +254,15 @@ export default function PaymentQRCode({
     popupUrl.searchParams.set('amount', String(amount));
     popupUrl.searchParams.set('theme', dark ? 'dark' : 'light');
     popupUrl.searchParams.set('method', stripePaymentMethod);
+    if (locale === 'en') {
+      popupUrl.searchParams.set('lang', 'en');
+    }
 
     const popup = window.open(popupUrl.toString(), 'stripe_payment', 'width=500,height=700,scrollbars=yes');
     if (!popup || popup.closed) {
       setPopupBlocked(true);
       return;
     }
-    // Send sensitive data via postMessage after popup loads
     const onReady = (event: MessageEvent) => {
       if (event.source !== popup || event.data?.type !== 'STRIPE_POPUP_READY') return;
       window.removeEventListener('message', onReady);
@@ -263,7 +285,7 @@ export default function PaymentQRCode({
       const diff = expiry - now;
 
       if (diff <= 0) {
-        setTimeLeft(TEXT_EXPIRED);
+        setTimeLeft(t.expired);
         setTimeLeftSeconds(0);
         setExpired(true);
         return;
@@ -279,7 +301,7 @@ export default function PaymentQRCode({
     updateTimer();
     const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, [expiresAt]);
+  }, [expiresAt, t.expired]);
 
   const pollStatus = useCallback(async () => {
     try {
@@ -291,7 +313,6 @@ export default function PaymentQRCode({
         }
       }
     } catch {
-      // ignore polling errors
     }
   }, [orderId, onStatusChange]);
 
@@ -305,7 +326,6 @@ export default function PaymentQRCode({
   const handleCancel = async () => {
     if (!token) return;
     try {
-      // 先检查当前订单状态
       const res = await fetch(`/api/orders/${orderId}`);
       if (!res.ok) return;
       const data = await res.json();
@@ -331,28 +351,27 @@ export default function PaymentQRCode({
         await pollStatus();
       }
     } catch {
-      // ignore
     }
   };
 
   const meta = getPaymentMeta(paymentType || 'alipay');
   const iconSrc = getPaymentIconSrc(paymentType || 'alipay');
-  const channelLabel = getPaymentChannelLabel(paymentType || 'alipay');
+  const channelLabel = getPaymentChannelLabel(paymentType || 'alipay', locale);
   const iconBgClass = meta.iconBg;
 
   if (cancelBlocked) {
     return (
       <div className="flex flex-col items-center space-y-4 py-8">
         <div className="text-6xl text-green-600">{'✓'}</div>
-        <h2 className="text-xl font-bold text-green-600">{'订单已支付'}</h2>
+        <h2 className="text-xl font-bold text-green-600">{t.paid}</h2>
         <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-          {'该订单已支付完成，无法取消。充值将自动到账。'}
+          {t.paidCancelBlocked}
         </p>
         <button
           onClick={onBack}
           className="mt-4 w-full rounded-lg bg-blue-600 py-3 font-medium text-white hover:bg-blue-700"
         >
-          {'返回充值'}
+          {t.backToRecharge}
         </button>
       </div>
     );
@@ -367,11 +386,12 @@ export default function PaymentQRCode({
         </div>
         {hasFeeDiff && (
           <div className={['mt-1 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-            到账 ¥{amount.toFixed(2)}
+            {t.credited}
+            {amount.toFixed(2)}
           </div>
         )}
         <div className={`mt-1 text-sm ${expired ? 'text-red-500' : !expired && timeLeftSeconds <= 60 ? 'text-red-500 animate-pulse' : dark ? 'text-slate-400' : 'text-gray-500'}`}>
-          {expired ? TEXT_EXPIRED : `${TEXT_REMAINING}: ${timeLeft}`}
+          {expired ? t.expired : `${t.remaining}: ${timeLeft}`}
         </div>
       </div>
 
@@ -387,14 +407,14 @@ export default function PaymentQRCode({
                   ].join(' ')}
                 >
                   <p className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                    支付初始化失败，请返回重试
+                    {t.initFailed}
                   </p>
                 </div>
               ) : !stripeLoaded ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#635bff] border-t-transparent" />
                   <span className={['ml-3 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                    正在加载支付表单...
+                    {t.loadingForm}
                   </span>
                 </div>
               ) : stripeError && !stripeLib ? (
@@ -420,7 +440,7 @@ export default function PaymentQRCode({
                     <div className="text-center">
                       <div className="text-4xl text-green-600">{'✓'}</div>
                       <p className={['mt-2 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                        支付成功，正在处理订单...
+                        {t.successProcessing}
                       </p>
                     </div>
                   ) : (
@@ -431,17 +451,17 @@ export default function PaymentQRCode({
                       className={[
                         'w-full rounded-lg py-3 font-medium text-white shadow-md transition-colors',
                         stripeSubmitting
-                          ? 'bg-gray-400 cursor-not-allowed'
+                          ? 'cursor-not-allowed bg-gray-400'
                           : meta.buttonClass,
                       ].join(' ')}
                     >
                       {stripeSubmitting ? (
                         <span className="inline-flex items-center gap-2">
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                          处理中...
+                          {t.processing}
                         </span>
                       ) : (
-                        `支付 ¥${amount.toFixed(2)}`
+                        `${t.payNow} ¥${amount.toFixed(2)}`
                       )}
                     </button>
                   )}
@@ -454,7 +474,7 @@ export default function PaymentQRCode({
                           : 'border-amber-200 bg-amber-50 text-amber-700',
                       ].join(' ')}
                     >
-                      弹出窗口被浏览器拦截，请允许本站弹出窗口后重试
+                      {t.popupBlocked}
                     </div>
                   )}
                 </>
@@ -465,7 +485,7 @@ export default function PaymentQRCode({
               <div className="flex items-center justify-center py-6">
                 <div className={`h-8 w-8 animate-spin rounded-full border-2 border-t-transparent`} style={{ borderColor: meta.color, borderTopColor: 'transparent' }} />
                 <span className={['ml-3 text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                  正在跳转到{channelLabel}...
+                  {`${t.redirectingPrefix}${channelLabel}${t.redirectingSuffix}`}
                 </span>
               </div>
               <a
@@ -475,10 +495,10 @@ export default function PaymentQRCode({
                 className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium text-white shadow-md ${meta.buttonClass}`}
               >
                 {iconSrc && <img src={iconSrc} alt={channelLabel} className="h-5 w-5 brightness-0 invert" />}
-                {redirected ? `未跳转？点击前往${channelLabel}` : `前往${channelLabel}支付`}
+                {redirected ? `${t.notRedirectedPrefix}${channelLabel}` : `${t.gotoPrefix}${channelLabel}${t.gotoSuffix}`}
               </a>
               <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                {TEXT_H5_HINT}
+                {t.h5Hint}
               </p>
             </>
           ) : (
@@ -512,13 +532,13 @@ export default function PaymentQRCode({
                       dark ? 'border-slate-700' : 'border-gray-300',
                     ].join(' ')}
                   >
-                    <p className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>{TEXT_SCAN_PAY}</p>
+                    <p className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>{t.scanPay}</p>
                   </div>
                 </div>
               )}
 
               <p className={['text-center text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
-                {`请打开${channelLabel}扫一扫完成支付`}
+                {`${t.openScanPrefix}${channelLabel}${t.openScanSuffix}`}
               </p>
             </>
           )}
@@ -535,7 +555,7 @@ export default function PaymentQRCode({
               : 'border-gray-300 text-gray-600 hover:bg-gray-50',
           ].join(' ')}
         >
-          {TEXT_BACK}
+          {t.back}
         </button>
         {!expired && token && (
           <button
@@ -547,7 +567,7 @@ export default function PaymentQRCode({
                 : 'border-red-300 text-red-600 hover:bg-red-50',
             ].join(' ')}
           >
-            {TEXT_CANCEL_ORDER}
+            {t.cancelOrder}
           </button>
         )}
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import type { Locale } from '@/lib/locale';
 
 interface RefundDialogProps {
   orderId: string;
@@ -10,6 +11,7 @@ interface RefundDialogProps {
   warning?: string;
   requireForce?: boolean;
   dark?: boolean;
+  locale?: Locale;
 }
 
 export default function RefundDialog({
@@ -20,10 +22,37 @@ export default function RefundDialog({
   warning,
   requireForce,
   dark = false,
+  locale = 'zh',
 }: RefundDialogProps) {
   const [reason, setReason] = useState('');
   const [force, setForce] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const currency = locale === 'en' ? '$' : '¥';
+  const text =
+    locale === 'en'
+      ? {
+          title: 'Confirm Refund',
+          orderId: 'Order ID',
+          amount: 'Refund Amount',
+          reason: 'Refund Reason',
+          reasonPlaceholder: 'Enter refund reason (optional)',
+          forceRefund: 'Force refund (balance may become negative)',
+          cancel: 'Cancel',
+          confirm: 'Confirm Refund',
+          processing: 'Processing...',
+        }
+      : {
+          title: '确认退款',
+          orderId: '订单号',
+          amount: '退款金额',
+          reason: '退款原因',
+          reasonPlaceholder: '请输入退款原因（可选）',
+          forceRefund: '强制退款（余额可能扣为负数）',
+          cancel: '取消',
+          confirm: '确认退款',
+          processing: '处理中...',
+        };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -51,17 +80,17 @@ export default function RefundDialog({
         ].join(' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className={['text-lg font-bold', dark ? 'text-slate-100' : 'text-gray-900'].join(' ')}>确认退款</h3>
+        <h3 className={['text-lg font-bold', dark ? 'text-slate-100' : 'text-gray-900'].join(' ')}>{text.title}</h3>
 
         <div className="mt-4 space-y-3">
           <div className={['rounded-lg p-3', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
-            <div className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>订单号</div>
+            <div className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>{text.orderId}</div>
             <div className="text-sm font-mono">{orderId}</div>
           </div>
 
           <div className={['rounded-lg p-3', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
-            <div className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>退款金额</div>
-            <div className="text-lg font-bold text-red-600">¥{amount.toFixed(2)}</div>
+            <div className={['text-sm', dark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>{text.amount}</div>
+            <div className="text-lg font-bold text-red-600">{currency}{amount.toFixed(2)}</div>
           </div>
 
           {warning && (
@@ -77,13 +106,13 @@ export default function RefundDialog({
 
           <div>
             <label className={['mb-1 block text-sm font-medium', dark ? 'text-slate-300' : 'text-gray-700'].join(' ')}>
-              退款原因
+              {text.reason}
             </label>
             <input
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="请输入退款原因（可选）"
+              placeholder={text.reasonPlaceholder}
               className={[
                 'w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none',
                 dark ? 'border-slate-600 bg-slate-800 text-slate-100' : 'border-gray-300 bg-white text-gray-900',
@@ -99,7 +128,7 @@ export default function RefundDialog({
                 onChange={(e) => setForce(e.target.checked)}
                 className={['rounded', dark ? 'border-slate-600' : 'border-gray-300'].join(' ')}
               />
-              <span className="text-red-600">强制退款（余额可能扣为负数）</span>
+              <span className="text-red-600">{text.forceRefund}</span>
             </label>
           )}
         </div>
@@ -114,14 +143,14 @@ export default function RefundDialog({
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50',
             ].join(' ')}
           >
-            取消
+            {text.cancel}
           </button>
           <button
             onClick={handleConfirm}
             disabled={loading || (requireForce && !force)}
             className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-300"
           >
-            {loading ? '处理中...' : '确认退款'}
+            {loading ? text.processing : text.confirm}
           </button>
         </div>
       </div>

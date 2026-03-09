@@ -6,6 +6,7 @@ import OrderTable from '@/components/admin/OrderTable';
 import OrderDetail from '@/components/admin/OrderDetail';
 import PaginationBar from '@/components/PaginationBar';
 import PayPageLayout from '@/components/PayPageLayout';
+import { resolveLocale, type Locale } from '@/lib/locale';
 
 interface AdminOrder {
   id: string;
@@ -47,8 +48,71 @@ function AdminContent() {
   const token = searchParams.get('token');
   const theme = searchParams.get('theme') === 'dark' ? 'dark' : 'light';
   const uiMode = searchParams.get('ui_mode') || 'standalone';
+  const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
   const isEmbedded = uiMode === 'embedded';
+
+  const text = locale === 'en'
+    ? {
+        missingToken: 'Missing admin token',
+        missingTokenHint: 'Please access the admin page from the Sub2API platform.',
+        invalidToken: 'Invalid admin token',
+        requestFailed: 'Request failed',
+        loadOrdersFailed: 'Failed to load orders',
+        retryConfirm: 'Retry recharge for this order?',
+        retryFailed: 'Retry failed',
+        retryRequestFailed: 'Retry request failed',
+        cancelConfirm: 'Cancel this order?',
+        cancelFailed: 'Cancel failed',
+        cancelRequestFailed: 'Cancel request failed',
+        loadDetailFailed: 'Failed to load order details',
+        title: 'Order Management',
+        subtitle: 'View and manage all recharge orders',
+        dashboard: 'Dashboard',
+        refresh: 'Refresh',
+        loading: 'Loading...',
+        statuses: {
+          '': 'All',
+          PENDING: 'Pending',
+          PAID: 'Paid',
+          RECHARGING: 'Recharging',
+          COMPLETED: 'Completed',
+          EXPIRED: 'Expired',
+          CANCELLED: 'Cancelled',
+          FAILED: 'Recharge failed',
+          REFUNDED: 'Refunded',
+        },
+      }
+    : {
+        missingToken: '缺少管理员凭证',
+        missingTokenHint: '请从 Sub2API 平台正确访问管理页面',
+        invalidToken: '管理员凭证无效',
+        requestFailed: '请求失败',
+        loadOrdersFailed: '加载订单列表失败',
+        retryConfirm: '确认重试充值？',
+        retryFailed: '重试失败',
+        retryRequestFailed: '重试请求失败',
+        cancelConfirm: '确认取消该订单？',
+        cancelFailed: '取消失败',
+        cancelRequestFailed: '取消请求失败',
+        loadDetailFailed: '加载订单详情失败',
+        title: '订单管理',
+        subtitle: '查看和管理所有充值订单',
+        dashboard: '数据概览',
+        refresh: '刷新',
+        loading: '加载中...',
+        statuses: {
+          '': '全部',
+          PENDING: '待支付',
+          PAID: '已支付',
+          RECHARGING: '充值中',
+          COMPLETED: '已完成',
+          EXPIRED: '已超时',
+          CANCELLED: '已取消',
+          FAILED: '充值失败',
+          REFUNDED: '已退款',
+        },
+      };
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
@@ -71,18 +135,18 @@ function AdminContent() {
       const res = await fetch(`/api/admin/orders?${params}`);
       if (!res.ok) {
         if (res.status === 401) {
-          setError('管理员凭证无效');
+          setError(text.invalidToken);
           return;
         }
-        throw new Error('请求失败');
+        throw new Error(text.requestFailed);
       }
 
       const data = await res.json();
       setOrders(data.orders);
       setTotal(data.total);
       setTotalPages(data.total_pages);
-    } catch (e) {
-      setError('加载订单列表失败');
+    } catch {
+      setError(text.loadOrdersFailed);
     } finally {
       setLoading(false);
     }
@@ -96,15 +160,15 @@ function AdminContent() {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
         <div className="text-center text-red-500">
-          <p className="text-lg font-medium">缺少管理员凭证</p>
-          <p className="mt-2 text-sm text-gray-500">请从 Sub2API 平台正确访问管理页面</p>
+          <p className="text-lg font-medium">{text.missingToken}</p>
+          <p className="mt-2 text-sm text-gray-500">{text.missingTokenHint}</p>
         </div>
       </div>
     );
   }
 
   const handleRetry = async (orderId: string) => {
-    if (!confirm('确认重试充值？')) return;
+    if (!confirm(text.retryConfirm)) return;
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/retry?token=${token}`, {
         method: 'POST',
@@ -113,15 +177,15 @@ function AdminContent() {
         fetchOrders();
       } else {
         const data = await res.json();
-        setError(data.error || '重试失败');
+        setError(data.error || text.retryFailed);
       }
     } catch {
-      setError('重试请求失败');
+      setError(text.retryRequestFailed);
     }
   };
 
   const handleCancel = async (orderId: string) => {
-    if (!confirm('确认取消该订单？')) return;
+    if (!confirm(text.cancelConfirm)) return;
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/cancel?token=${token}`, {
         method: 'POST',
@@ -130,10 +194,10 @@ function AdminContent() {
         fetchOrders();
       } else {
         const data = await res.json();
-        setError(data.error || '取消失败');
+        setError(data.error || text.cancelFailed);
       }
     } catch {
-      setError('取消请求失败');
+      setError(text.cancelRequestFailed);
     }
   };
 
@@ -145,25 +209,16 @@ function AdminContent() {
         setDetailOrder(data);
       }
     } catch {
-      setError('加载订单详情失败');
+      setError(text.loadDetailFailed);
     }
   };
 
   const statuses = ['', 'PENDING', 'PAID', 'RECHARGING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED', 'REFUNDED'];
-  const statusLabels: Record<string, string> = {
-    '': '全部',
-    PENDING: '待支付',
-    PAID: '已支付',
-    RECHARGING: '充值中',
-    COMPLETED: '已完成',
-    EXPIRED: '已超时',
-    CANCELLED: '已取消',
-    FAILED: '充值失败',
-    REFUNDED: '已退款',
-  };
+  const statusLabels: Record<string, string> = text.statuses;
 
   const navParams = new URLSearchParams();
   if (token) navParams.set('token', token);
+  if (locale === 'en') navParams.set('lang', 'en');
   if (isDark) navParams.set('theme', 'dark');
   if (isEmbedded) navParams.set('ui_mode', 'embedded');
 
@@ -179,15 +234,16 @@ function AdminContent() {
       isDark={isDark}
       isEmbedded={isEmbedded}
       maxWidth="full"
-      title="订单管理"
-      subtitle="查看和管理所有充值订单"
+      title={text.title}
+      subtitle={text.subtitle}
+      locale={locale}
       actions={
         <>
           <a href={`/admin/dashboard?${navParams}`} className={btnBase}>
-            数据概览
+            {text.dashboard}
           </a>
           <button type="button" onClick={fetchOrders} className={btnBase}>
-            刷新
+            {text.refresh}
           </button>
         </>
       }
@@ -236,7 +292,7 @@ function AdminContent() {
         ].join(' ')}
       >
         {loading ? (
-          <div className={`py-12 text-center ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>加载中...</div>
+          <div className={`py-12 text-center ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{text.loading}</div>
         ) : (
           <OrderTable
             orders={orders}
@@ -244,6 +300,7 @@ function AdminContent() {
             onCancel={handleCancel}
             onViewDetail={handleViewDetail}
             dark={isDark}
+            locale={locale}
           />
         )}
       </div>
@@ -259,23 +316,31 @@ function AdminContent() {
           setPageSize(s);
           setPage(1);
         }}
+        locale={locale}
         isDark={isDark}
       />
 
       {/* Order Detail */}
-      {detailOrder && <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} dark={isDark} />}
+      {detailOrder && <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} dark={isDark} locale={locale} />}
     </PayPageLayout>
+  );
+}
+
+function AdminPageFallback() {
+  const searchParams = useSearchParams();
+  const locale = resolveLocale(searchParams.get('lang'));
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-gray-500">{locale === 'en' ? 'Loading...' : '加载中...'}</div>
+    </div>
   );
 }
 
 export default function AdminPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-gray-500">加载中...</div>
-        </div>
-      }
+      fallback={<AdminPageFallback />}
     >
       <AdminContent />
     </Suspense>

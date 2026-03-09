@@ -1,6 +1,7 @@
 'use client';
 
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import type { Locale } from '@/lib/locale';
 
 interface DailyData {
   date: string;
@@ -11,6 +12,7 @@ interface DailyData {
 interface DailyChartProps {
   data: DailyData[];
   dark?: boolean;
+  locale?: Locale;
 }
 
 function formatDate(dateStr: string) {
@@ -34,11 +36,17 @@ function CustomTooltip({
   payload,
   label,
   dark,
+  currency,
+  amountLabel,
+  countLabel,
 }: {
   active?: boolean;
   payload?: TooltipPayload[];
   label?: string;
   dark?: boolean;
+  currency: string;
+  amountLabel: string;
+  countLabel: string;
 }) {
   if (!active || !payload?.length) return null;
   return (
@@ -51,16 +59,20 @@ function CustomTooltip({
       <p className={['mb-1 text-xs', dark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{label}</p>
       {payload.map((p) => (
         <p key={p.dataKey}>
-          {p.dataKey === 'amount' ? '金额' : '笔数'}:{' '}
-          {p.dataKey === 'amount' ? `¥${p.value.toLocaleString()}` : p.value}
+          {p.dataKey === 'amount' ? amountLabel : countLabel}:{' '}
+          {p.dataKey === 'amount' ? `${currency}${p.value.toLocaleString()}` : p.value}
         </p>
       ))}
     </div>
   );
 }
 
-export default function DailyChart({ data, dark }: DailyChartProps) {
-  // Auto-calculate tick interval: show ~10-15 labels max
+export default function DailyChart({ data, dark, locale = 'zh' }: DailyChartProps) {
+  const currency = locale === 'en' ? '$' : '¥';
+  const chartTitle = locale === 'en' ? 'Daily Recharge Trend' : '每日充值趋势';
+  const emptyText = locale === 'en' ? 'No data' : '暂无数据';
+  const amountLabel = locale === 'en' ? 'Amount' : '金额';
+  const countLabel = locale === 'en' ? 'Orders' : '笔数';
   const tickInterval = data.length > 30 ? Math.ceil(data.length / 12) - 1 : 0;
   if (data.length === 0) {
     return (
@@ -71,9 +83,9 @@ export default function DailyChart({ data, dark }: DailyChartProps) {
         ].join(' ')}
       >
         <h3 className={['mb-4 text-sm font-semibold', dark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-          每日充值趋势
+          {chartTitle}
         </h3>
-        <p className={['text-center text-sm py-16', dark ? 'text-slate-500' : 'text-gray-400'].join(' ')}>暂无数据</p>
+        <p className={['text-center text-sm py-16', dark ? 'text-slate-500' : 'text-gray-400'].join(' ')}>{emptyText}</p>
       </div>
     );
   }
@@ -89,7 +101,7 @@ export default function DailyChart({ data, dark }: DailyChartProps) {
       ].join(' ')}
     >
       <h3 className={['mb-4 text-sm font-semibold', dark ? 'text-slate-200' : 'text-slate-800'].join(' ')}>
-        每日充值趋势
+        {chartTitle}
       </h3>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
@@ -109,7 +121,7 @@ export default function DailyChart({ data, dark }: DailyChartProps) {
             tickLine={false}
             width={60}
           />
-          <Tooltip content={<CustomTooltip dark={dark} />} />
+          <Tooltip content={<CustomTooltip dark={dark} currency={currency} amountLabel={amountLabel} countLabel={countLabel} />} />
           <Line
             type="monotone"
             dataKey="amount"

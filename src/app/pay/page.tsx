@@ -7,6 +7,7 @@ import PaymentQRCode from '@/components/PaymentQRCode';
 import OrderStatus from '@/components/OrderStatus';
 import PayPageLayout from '@/components/PayPageLayout';
 import MobileOrderList from '@/components/MobileOrderList';
+import { resolveLocale, pickLocaleText, applyLocaleToSearchParams } from '@/lib/locale';
 import { detectDeviceIsMobile, applySublabelOverrides, type UserInfo, type MyOrder } from '@/lib/pay-utils';
 import type { MethodLimitInfo } from '@/components/PaymentForm';
 
@@ -41,6 +42,7 @@ function PayContent() {
   const tab = searchParams.get('tab');
   const srcHost = searchParams.get('src_host') || undefined;
   const srcUrl = searchParams.get('src_url') || undefined;
+  const locale = resolveLocale(searchParams.get('lang'));
   const isDark = theme === 'dark';
 
   const [isIframeContext, setIsIframeContext] = useState(true);
@@ -97,7 +99,6 @@ function PayContent() {
 
     setUserNotFound(false);
     try {
-      // 通过 token 获取用户详情和订单
       const meRes = await fetch(`/api/orders/my?token=${encodeURIComponent(token)}`);
       if (!meRes.ok) {
         setUserNotFound(true);
@@ -120,7 +121,7 @@ function PayContent() {
         username:
           (typeof meUser.displayName === 'string' && meUser.displayName.trim()) ||
           (typeof meUser.username === 'string' && meUser.username.trim()) ||
-          `用户 #${meId}`,
+          pickLocaleText(locale, `用户 #${meId}`, `User #${meId}`),
         balance: typeof meUser.balance === 'number' ? meUser.balance : undefined,
       });
 
@@ -134,7 +135,6 @@ function PayContent() {
         setOrdersHasMore(false);
       }
 
-      // 获取服务端支付配置
       const cfgRes = await fetch(`/api/user?user_id=${meId}&token=${encodeURIComponent(token)}`);
       if (cfgRes.ok) {
         const cfgData = await cfgRes.json();
@@ -155,7 +155,6 @@ function PayContent() {
         }
       }
     } catch {
-      // ignore and keep page usable
     }
   };
 
@@ -175,7 +174,6 @@ function PayContent() {
         setOrdersHasMore(false);
       }
     } catch {
-      // ignore
     } finally {
       setOrdersLoadingMore(false);
     }
@@ -183,12 +181,10 @@ function PayContent() {
 
   useEffect(() => {
     loadUserAndOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, locale]);
 
   useEffect(() => {
     if (step !== 'result' || finalStatus !== 'COMPLETED') return;
-    // 立即在后台刷新余额，2.2s 显示结果页后再切回表单（届时余额已更新）
     loadUserAndOrders();
     const timer = setTimeout(() => {
       setStep('form');
@@ -197,15 +193,16 @@ function PayContent() {
       setError('');
     }, 2200);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, finalStatus]);
 
   if (!hasToken) {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
         <div className="text-center text-red-500">
-          <p className="text-lg font-medium">缺少认证信息</p>
-          <p className="mt-2 text-sm text-gray-500">请从 Sub2API 平台正确访问充值页面</p>
+          <p className="text-lg font-medium">{pickLocaleText(locale, '缺少认证信息', 'Missing authentication info')}</p>
+          <p className="mt-2 text-sm text-gray-500">
+            {pickLocaleText(locale, '请从 Sub2API 平台正确访问充值页面', 'Please open the recharge page from the Sub2API platform')}
+          </p>
         </div>
       </div>
     );
@@ -215,8 +212,10 @@ function PayContent() {
     return (
       <div className={`flex min-h-screen items-center justify-center p-4 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
         <div className="text-center text-red-500">
-          <p className="text-lg font-medium">用户不存在</p>
-          <p className="mt-2 text-sm text-gray-500">请检查链接是否正确，或联系管理员</p>
+          <p className="text-lg font-medium">{pickLocaleText(locale, '用户不存在', 'User not found')}</p>
+          <p className="mt-2 text-sm text-gray-500">
+            {pickLocaleText(locale, '请检查链接是否正确，或联系管理员', 'Please check whether the link is correct or contact the administrator')}
+          </p>
         </div>
       </div>
     );
@@ -228,6 +227,9 @@ function PayContent() {
     params.set('theme', theme);
     params.set('ui_mode', uiMode);
     if (forceOrdersTab) params.set('tab', 'orders');
+    if (srcHost) params.set('src_host', srcHost);
+    if (srcUrl) params.set('src_url', srcUrl);
+    applyLocaleToSearchParams(params, locale);
     return `${path}?${params.toString()}`;
   };
 
@@ -237,7 +239,13 @@ function PayContent() {
 
   const handleSubmit = async (amount: number, paymentType: string) => {
     if (pendingBlocked) {
-      setError(`您有 ${pendingCount} 个待支付订单，请先完成或取消后再试（最多 ${MAX_PENDING} 个）`);
+      setError(
+        pickLocaleText(
+          locale,
+          `您有 ${pendingCount} 个待支付订单，请先完成或取消后再试（最多 ${MAX_PENDING} 个）`,
+          `You have ${pendingCount} pending orders. Please complete or cancel them first (maximum ${MAX_PENDING}).`,
+        ),
+      );
       return;
     }
 
@@ -262,15 +270,15 @@ function PayContent() {
 
       if (!res.ok) {
         const codeMessages: Record<string, string> = {
-          INVALID_TOKEN: '认证已失效，请重新从平台进入充值页面',
-          USER_INACTIVE: '账户已被禁用，无法充值，请联系管理员',
-          TOO_MANY_PENDING: '您有过多待支付订单，请先完成或取消现有订单后再试',
-          USER_NOT_FOUND: '用户不存在，请检查链接是否正确',
+          INVALID_TOKEN: pickLocaleText(locale, '认证已失效，请重新从平台进入充值页面', 'Authentication expired. Please re-enter the recharge page from the platform'),
+          USER_INACTIVE: pickLocaleText(locale, '账户已被禁用，无法充值，请联系管理员', 'This account is disabled and cannot be recharged. Please contact the administrator'),
+          TOO_MANY_PENDING: pickLocaleText(locale, '您有过多待支付订单，请先完成或取消现有订单后再试', 'You have too many pending orders. Please complete or cancel existing orders first'),
+          USER_NOT_FOUND: pickLocaleText(locale, '用户不存在，请检查链接是否正确', 'User not found. Please check whether the link is correct'),
           DAILY_LIMIT_EXCEEDED: data.error,
           METHOD_DAILY_LIMIT_EXCEEDED: data.error,
           PAYMENT_GATEWAY_ERROR: data.error,
         };
-        setError(codeMessages[data.code] || data.error || '创建订单失败');
+        setError(codeMessages[data.code] || data.error || pickLocaleText(locale, '创建订单失败', 'Failed to create order'));
         return;
       }
 
@@ -288,7 +296,7 @@ function PayContent() {
 
       setStep('paying');
     } catch {
-      setError('网络错误，请稍后重试');
+      setError(pickLocaleText(locale, '网络错误，请稍后重试', 'Network error. Please try again later'));
     } finally {
       setLoading(false);
     }
@@ -314,8 +322,9 @@ function PayContent() {
       isDark={isDark}
       isEmbedded={isEmbedded}
       maxWidth={isMobile ? 'sm' : 'lg'}
-      title="Sub2API 余额充值"
-      subtitle="安全支付，自动到账"
+      title={pickLocaleText(locale, 'Sub2API 余额充值', 'Sub2API Balance Recharge')}
+      subtitle={pickLocaleText(locale, '安全支付，自动到账', 'Secure payment, automatic crediting')}
+      locale={locale}
       actions={
         !isMobile ? (
           <>
@@ -329,7 +338,7 @@ function PayContent() {
                   : 'border-slate-300 text-slate-700 hover:bg-slate-100',
               ].join(' ')}
             >
-              刷新
+              {pickLocaleText(locale, '刷新', 'Refresh')}
             </button>
             <a
               href={ordersUrl}
@@ -340,7 +349,7 @@ function PayContent() {
                   : 'border-slate-300 text-slate-700 hover:bg-slate-100',
               ].join(' ')}
             >
-              我的订单
+              {pickLocaleText(locale, '我的订单', 'My Orders')}
             </a>
           </>
         ) : undefined
@@ -378,7 +387,7 @@ function PayContent() {
                   : 'text-slate-500 hover:text-slate-700',
             ].join(' ')}
           >
-            充值
+            {pickLocaleText(locale, '充值', 'Recharge')}
           </button>
           <button
             type="button"
@@ -394,7 +403,7 @@ function PayContent() {
                   : 'text-slate-500 hover:text-slate-700',
             ].join(' ')}
           >
-            我的订单
+            {pickLocaleText(locale, '我的订单', 'My Orders')}
           </button>
         </div>
       )}
@@ -402,7 +411,9 @@ function PayContent() {
       {step === 'form' && config.enabledPaymentTypes.length === 0 && (
         <div className="flex items-center justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          <span className={['ml-3 text-sm', isDark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>加载中...</span>
+          <span className={['ml-3 text-sm', isDark ? 'text-slate-400' : 'text-gray-500'].join(' ')}>
+            {pickLocaleText(locale, '加载中...', 'Loading...')}
+          </span>
         </div>
       )}
 
@@ -423,6 +434,7 @@ function PayContent() {
                 dark={isDark}
                 pendingBlocked={pendingBlocked}
                 pendingCount={pendingCount}
+                locale={locale}
               />
             ) : (
               <MobileOrderList
@@ -433,6 +445,7 @@ function PayContent() {
                 loadingMore={ordersLoadingMore}
                 onRefresh={loadUserAndOrders}
                 onLoadMore={loadMoreOrders}
+                locale={locale}
               />
             )
           ) : (
@@ -451,6 +464,7 @@ function PayContent() {
                   dark={isDark}
                   pendingBlocked={pendingBlocked}
                   pendingCount={pendingCount}
+                  locale={locale}
                 />
               </div>
               <div className="space-y-4">
@@ -460,11 +474,17 @@ function PayContent() {
                     isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50',
                   ].join(' ')}
                 >
-                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>支付说明</div>
+                  <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                    {pickLocaleText(locale, '支付说明', 'Payment Notes')}
+                  </div>
                   <ul className={['mt-2 space-y-1 text-sm', isDark ? 'text-slate-300' : 'text-slate-600'].join(' ')}>
-                    <li>订单完成后会自动到账</li>
-                    <li>如需历史记录请查看「我的订单」</li>
-                    {config.maxDailyAmount > 0 && <li>每日最大充值 ¥{config.maxDailyAmount.toFixed(2)}</li>}
+                    <li>{pickLocaleText(locale, '订单完成后会自动到账', 'Balance will be credited automatically after the order completes')}</li>
+                    <li>{pickLocaleText(locale, '如需历史记录请查看「我的订单」', 'Check "My Orders" for payment history')}</li>
+                    {config.maxDailyAmount > 0 && (
+                      <li>
+                        {pickLocaleText(locale, '每日最大充值', 'Maximum daily recharge')} ¥{config.maxDailyAmount.toFixed(2)}
+                      </li>
+                    )}
                   </ul>
                 </div>
 
@@ -475,7 +495,9 @@ function PayContent() {
                       isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50',
                     ].join(' ')}
                   >
-                    <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>Support</div>
+                    <div className={['text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                      {pickLocaleText(locale, '帮助', 'Support')}
+                    </div>
                     {helpImageUrl && (
                       <img
                         src={helpImageUrl}
@@ -491,7 +513,7 @@ function PayContent() {
                           isDark ? 'text-slate-300' : 'text-slate-600',
                         ].join(' ')}
                       >
-                        {helpText.split('\\n').map((line, i) => (
+                        {helpText.split('\n').map((line, i) => (
                           <p key={i}>{line}</p>
                         ))}
                       </div>
@@ -521,10 +543,11 @@ function PayContent() {
           dark={isDark}
           isEmbedded={isEmbedded}
           isMobile={isMobile}
+          locale={locale}
         />
       )}
 
-      {step === 'result' && <OrderStatus status={finalStatus} onBack={handleBack} dark={isDark} />}
+      {step === 'result' && <OrderStatus status={finalStatus} onBack={handleBack} dark={isDark} locale={locale} />}
 
       {helpImageOpen && helpImageUrl && (
         <div
@@ -543,14 +566,21 @@ function PayContent() {
   );
 }
 
+function PayPageFallback() {
+  const searchParams = useSearchParams();
+  const locale = resolveLocale(searchParams.get('lang'));
+
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-gray-500">{pickLocaleText(locale, '加载中...', 'Loading...')}</div>
+    </div>
+  );
+}
+
 export default function PayPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-gray-500">加载中...</div>
-        </div>
-      }
+      fallback={<PayPageFallback />}
     >
       <PayContent />
     </Suspense>
