@@ -73,11 +73,16 @@ export default function SubscriptionPlanCard({ plan, onSubscribe, isDark, locale
           {isOpenAI && plan.allowMessagesDispatch && (
             <span
               className={[
-                'rounded-full px-2 py-0.5 text-xs font-medium',
+                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
                 isDark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700',
               ].join(' ')}
             >
               /v1/messages
+              {plan.defaultMappedModel && (
+                <span className={['font-mono', isDark ? 'text-green-400' : 'text-green-800'].join(' ')}>
+                  {plan.defaultMappedModel}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -146,23 +151,6 @@ export default function SubscriptionPlanCard({ plan, onSubscribe, isDark, locale
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* OpenAI specific: default model */}
-      {isOpenAI && plan.defaultMappedModel && (
-        <div
-          className={[
-            'mb-4 flex items-center justify-between rounded-lg border px-3 py-2 text-sm',
-            isDark ? 'border-green-500/30 bg-green-500/10' : 'border-green-200 bg-green-50/50',
-          ].join(' ')}
-        >
-          <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-            {pickLocaleText(locale, '默认模型', 'Default Model')}
-          </span>
-          <span className={['text-xs font-mono', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
-            {plan.defaultMappedModel}
-          </span>
         </div>
       )}
 

@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { path: '/admin/subscriptions', label: { zh: '订阅管理', en: 'Subscriptions' } },
 ];
 
-function AdminNav() {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const token = searchParams.get('token') || '';
@@ -35,39 +35,43 @@ function AdminNav() {
   };
 
   return (
-    <nav
-      className={[
-        'mb-4 flex flex-wrap gap-1 rounded-xl border p-1',
-        isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-100/90',
-      ].join(' ')}
-    >
-      {NAV_ITEMS.map((item) => (
-        <a
-          key={item.path}
-          href={buildUrl(item.path)}
+    <div className={['min-h-screen', isDark ? 'bg-slate-950' : 'bg-slate-100'].join(' ')}>
+      <div className="px-2 pt-2 sm:px-3 sm:pt-3">
+        <nav
           className={[
-            'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-            isActive(item.path)
-              ? isDark
-                ? 'bg-indigo-500/30 text-indigo-100 ring-1 ring-indigo-300/35'
-                : 'bg-white text-slate-900 ring-1 ring-slate-300 shadow-sm'
-              : isDark
-                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/70',
+            'mb-1 flex flex-wrap gap-1 rounded-xl border p-1',
+            isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-100/90',
           ].join(' ')}
         >
-          {item.label[locale]}
-        </a>
-      ))}
-    </nav>
+          {NAV_ITEMS.map((item) => (
+            <a
+              key={item.path}
+              href={buildUrl(item.path)}
+              className={[
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                isActive(item.path)
+                  ? isDark
+                    ? 'bg-indigo-500/30 text-indigo-100 ring-1 ring-indigo-300/35'
+                    : 'bg-white text-slate-900 ring-1 ring-slate-300 shadow-sm'
+                  : isDark
+                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/70',
+              ].join(' ')}
+            >
+              {item.label[locale]}
+            </a>
+          ))}
+        </nav>
+      </div>
+      {children}
+    </div>
   );
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense>
-      <AdminNav />
-      {children}
+      <AdminLayoutInner>{children}</AdminLayoutInner>
     </Suspense>
   );
 }
