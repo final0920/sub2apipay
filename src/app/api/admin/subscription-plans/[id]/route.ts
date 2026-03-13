@@ -16,7 +16,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // 确定最终 groupId：如果传了 group_id 用传入值，否则用现有值
-    const finalGroupId = body.group_id !== undefined ? (body.group_id ? Number(body.group_id) : null) : existing.groupId;
+    const finalGroupId =
+      body.group_id !== undefined ? (body.group_id ? Number(body.group_id) : null) : existing.groupId;
 
     // 必须绑定分组才能保存
     if (finalGroupId === null || finalGroupId === undefined) {
@@ -44,10 +45,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         where: { id },
         data: { groupId: null, forSale: false },
       });
-      return NextResponse.json(
-        { error: '该分组在 Sub2API 中已被删除，已自动解绑，请重新选择分组' },
-        { status: 409 },
-      );
+      return NextResponse.json({ error: '该分组在 Sub2API 中已被删除，已自动解绑，请重新选择分组' }, { status: 409 });
     }
 
     if (body.price !== undefined && (typeof body.price !== 'number' || body.price <= 0 || body.price > 99999999.99)) {

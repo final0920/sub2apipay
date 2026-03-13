@@ -689,9 +689,7 @@ export async function executeSubscriptionFulfillment(orderId: string): Promise<v
     let renewedSubscriptionId: number | undefined;
 
     const userSubs = await getUserSubscriptions(order.userId);
-    const activeSub = userSubs.find(
-      (s) => s.group_id === order.subscriptionGroupId && s.status === 'active',
-    );
+    const activeSub = userSubs.find((s) => s.group_id === order.subscriptionGroupId && s.status === 'active');
 
     if (activeSub) {
       // 续费：从到期日往后推算天数

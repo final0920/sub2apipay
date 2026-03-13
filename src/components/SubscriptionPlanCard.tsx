@@ -29,15 +29,7 @@ export interface PlanInfo {
 }
 
 /** 套餐信息展示（Header + 价格 + 描述 + 倍率/限额 + 特性），不含操作按钮 */
-export function PlanInfoDisplay({
-  plan,
-  isDark,
-  locale,
-}: {
-  plan: PlanInfo;
-  isDark: boolean;
-  locale: Locale;
-}) {
+export function PlanInfoDisplay({ plan, isDark, locale }: { plan: PlanInfo; isDark: boolean; locale: Locale }) {
   const unit = plan.validityUnit ?? 'day';
   const periodLabel = formatValidityLabel(plan.validityDays, unit, locale);
   const periodSuffix = formatValiditySuffix(plan.validityDays, unit, locale);
