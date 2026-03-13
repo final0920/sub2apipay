@@ -28,6 +28,7 @@ export class EasyPayProvider implements PaymentProvider {
       paymentType: request.paymentType as 'alipay' | 'wxpay',
       clientIp: request.clientIp || '127.0.0.1',
       productName: request.subject,
+      returnUrl: request.returnUrl,
     });
 
     return {

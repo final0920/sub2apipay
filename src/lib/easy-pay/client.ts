@@ -8,6 +8,7 @@ export interface CreatePaymentOptions {
   paymentType: string;
   clientIp: string;
   productName: string;
+  returnUrl?: string;
 }
 
 function normalizeCidList(cid?: string): string | undefined {
@@ -56,7 +57,7 @@ export async function createPayment(opts: CreatePaymentOptions): Promise<EasyPay
     type: opts.paymentType,
     out_trade_no: opts.outTradeNo,
     notify_url: env.EASY_PAY_NOTIFY_URL,
-    return_url: env.EASY_PAY_RETURN_URL,
+    return_url: opts.returnUrl || env.EASY_PAY_RETURN_URL,
     name: opts.productName,
     money: opts.amount,
     clientip: opts.clientIp,
