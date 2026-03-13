@@ -35,10 +35,10 @@ const ROUND_UP = 0;
  * feeAmount = ceil(rechargeAmount * feeRate / 100, 保留2位小数)
  * payAmount = rechargeAmount + feeAmount
  */
-export function calculatePayAmount(rechargeAmount: number, feeRate: number): number {
-  if (feeRate <= 0) return rechargeAmount;
+export function calculatePayAmount(rechargeAmount: number, feeRate: number): string {
+  if (feeRate <= 0) return rechargeAmount.toFixed(2);
   const amount = new Prisma.Decimal(rechargeAmount);
   const rate = new Prisma.Decimal(feeRate.toString());
   const feeAmount = amount.mul(rate).div(100).toDecimalPlaces(2, ROUND_UP);
-  return amount.plus(feeAmount).toNumber();
+  return amount.plus(feeAmount).toFixed(2);
 }

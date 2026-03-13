@@ -120,10 +120,15 @@ export class AlipayProvider implements PaymentProvider {
         status = 'pending';
     }
 
+    const amount = parseFloat(result.total_amount || '0');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error(`Alipay queryOrder: invalid total_amount "${result.total_amount}" for trade ${tradeNo}`);
+    }
+
     return {
       tradeNo: result.trade_no || tradeNo,
       status,
-      amount: Math.round(parseFloat(result.total_amount || '0') * 100) / 100,
+      amount: Math.round(amount * 100) / 100,
       paidAt: result.send_pay_date ? new Date(result.send_pay_date) : undefined,
     };
   }

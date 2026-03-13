@@ -47,6 +47,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少必填字段: group_id, name, platform, rate_multiplier' }, { status: 400 });
     }
 
+    if (typeof name !== 'string' || name.trim() === '') {
+      return NextResponse.json({ error: 'name 必须非空' }, { status: 400 });
+    }
+    if (typeof rate_multiplier !== 'number' || rate_multiplier <= 0) {
+      return NextResponse.json({ error: 'rate_multiplier 必须是正数' }, { status: 400 });
+    }
+    if (sort_order !== undefined && (!Number.isInteger(sort_order) || sort_order < 0)) {
+      return NextResponse.json({ error: 'sort_order 必须是非负整数' }, { status: 400 });
+    }
+
     // 验证 group_id 唯一性
     const existing = await prisma.channel.findUnique({
       where: { groupId: Number(group_id) },

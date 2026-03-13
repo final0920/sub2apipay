@@ -27,6 +27,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    if (body.price !== undefined && (typeof body.price !== 'number' || body.price <= 0)) {
+      return NextResponse.json({ error: 'price 必须是正数' }, { status: 400 });
+    }
+    if (body.validity_days !== undefined && (!Number.isInteger(body.validity_days) || body.validity_days <= 0)) {
+      return NextResponse.json({ error: 'validity_days 必须是正整数' }, { status: 400 });
+    }
+
     const data: Record<string, unknown> = {};
     if (body.group_id !== undefined) data.groupId = Number(body.group_id);
     if (body.name !== undefined) data.name = body.name;

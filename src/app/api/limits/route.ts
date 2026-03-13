@@ -1,11 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { queryMethodLimits } from '@/lib/order/limits';
 import { initPaymentProviders, paymentRegistry } from '@/lib/payment';
 import { getNextBizDayStartUTC } from '@/lib/time/biz-day';
+import { getCurrentUserByToken } from '@/lib/sub2api/client';
 
 /**
- * GET /api/limits
- * 返回各支付渠道今日限额使用情况，公开接口（无需鉴权）。
+ * GET /api/limits?token=xxx
+ * 返回各支付渠道今日限额使用情况。
  *
  * Response:
  * {
@@ -17,7 +18,18 @@ import { getNextBizDayStartUTC } from '@/lib/time/biz-day';
  *   resetAt: "2026-03-02T16:00:00.000Z"  // 业务时区（Asia/Shanghai）次日零点对应的 UTC 时间
  * }
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = request.nextUrl.searchParams.get('token')?.trim();
+  if (!token) {
+    return NextResponse.json({ error: 'token is required' }, { status: 400 });
+  }
+
+  try {
+    await getCurrentUserByToken(token);
+  } catch {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
   initPaymentProviders();
   const types = paymentRegistry.getSupportedTypes();
   const methods = await queryMethodLimits(types);

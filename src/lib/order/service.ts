@@ -158,7 +158,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   }
 
   const feeRate = getMethodFeeRate(input.paymentType);
-  const payAmount = calculatePayAmount(input.amount, feeRate);
+  const payAmountStr = calculatePayAmount(input.amount, feeRate);
+  const payAmountNum = Number(payAmountStr);
 
   const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
   const order = await prisma.$transaction(async (tx) => {
@@ -169,8 +170,8 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         userName: user.username,
         userNotes: user.notes || null,
         amount: new Prisma.Decimal(input.amount.toFixed(2)),
-        payAmount: new Prisma.Decimal(payAmount.toFixed(2)),
-        feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(2)) : null,
+        payAmount: new Prisma.Decimal(payAmountStr),
+        feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(4)) : null,
         rechargeCode: '',
         status: 'PENDING',
         paymentType: input.paymentType,
@@ -213,9 +214,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
     const paymentResult = await provider.createPayment({
       orderId: order.id,
-      amount: payAmount,
+      amount: payAmountNum,
       paymentType: input.paymentType,
-      subject: `${env.PRODUCT_NAME} ${payAmount.toFixed(2)} CNY`,
+      subject: `${env.PRODUCT_NAME} ${payAmountStr} CNY`,
       notifyUrl,
       returnUrl,
       clientIp: input.clientIp,
@@ -249,7 +250,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     return {
       orderId: order.id,
       amount: input.amount,
-      payAmount,
+      payAmount: payAmountNum,
       feeRate,
       status: ORDER_STATUS.PENDING,
       paymentType: input.paymentType,

@@ -87,7 +87,7 @@ const envSchema = z.object({
     .pipe(z.number().min(0).optional()),
   PRODUCT_NAME: z.string().default('Sub2API Balance Recharge'),
 
-  ADMIN_TOKEN: z.string().min(1),
+  ADMIN_TOKEN: z.string().min(16),
 
   NEXT_PUBLIC_APP_URL: z.string().url(),
   PAY_HELP_IMAGE_URL: optionalTrimmedString,

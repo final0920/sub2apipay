@@ -27,6 +27,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    if (body.rate_multiplier !== undefined && (typeof body.rate_multiplier !== 'number' || body.rate_multiplier <= 0)) {
+      return NextResponse.json({ error: 'rate_multiplier 必须是正数' }, { status: 400 });
+    }
+    if (body.sort_order !== undefined && (!Number.isInteger(body.sort_order) || body.sort_order < 0)) {
+      return NextResponse.json({ error: 'sort_order 必须是非负整数' }, { status: 400 });
+    }
+
     const data: Record<string, unknown> = {};
     if (body.group_id !== undefined) data.groupId = Number(body.group_id);
     if (body.name !== undefined) data.name = body.name;

@@ -168,7 +168,7 @@ function buildText(locale: Locale) {
         colPrice: '价格',
         colOriginalPrice: '原价',
         colValidDays: '有效期',
-        colEnabled: '售卖',
+        colEnabled: '启用售卖',
         colGroupStatus: '分组状态',
         colActions: '操作',
         edit: '编辑',
@@ -461,6 +461,25 @@ function SubscriptionsContent() {
     }
   };
 
+  /* --- toggle plan enabled --- */
+  const handleToggleEnabled = async (plan: SubscriptionPlan) => {
+    try {
+      const res = await fetch(`/api/admin/subscription-plans/${plan.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ for_sale: !plan.enabled }),
+      });
+      if (res.ok) {
+        setPlans((prev) => prev.map((p) => (p.id === plan.id ? { ...p, enabled: !p.enabled } : p)));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   /* --- fetch user subs --- */
   const fetchSubs = async () => {
     if (!token || !subsUserId.trim()) return;
@@ -705,20 +724,21 @@ function SubscriptionsContent() {
                             : t.unitDay}
                       </td>
                       <td className={tdCls}>
-                        <span
+                        <button
+                          type="button"
+                          onClick={() => handleToggleEnabled(plan)}
                           className={[
-                            'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                            plan.enabled
-                              ? isDark
-                                ? 'bg-green-500/20 text-green-300'
-                                : 'bg-green-50 text-green-700'
-                              : isDark
-                                ? 'bg-slate-700 text-slate-400'
-                                : 'bg-gray-100 text-gray-500',
+                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                            plan.enabled ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
                           ].join(' ')}
                         >
-                          {plan.enabled ? t.enabled : t.disabled}
-                        </span>
+                          <span
+                            className={[
+                              'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
+                              plan.enabled ? 'translate-x-4.5' : 'translate-x-0.5',
+                            ].join(' ')}
+                          />
+                        </button>
                       </td>
                       <td className={tdCls}>
                         <span
@@ -1083,19 +1103,24 @@ function SubscriptionsContent() {
 
               {/* Enabled */}
               <div className="flex items-center gap-2">
-                <input
-                  id="form-enabled"
-                  type="checkbox"
-                  checked={formEnabled}
-                  onChange={(e) => setFormEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                <label
-                  htmlFor="form-enabled"
-                  className={['text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}
+                <button
+                  type="button"
+                  onClick={() => setFormEnabled(!formEnabled)}
+                  className={[
+                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                    formEnabled ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
+                  ].join(' ')}
                 >
+                  <span
+                    className={[
+                      'inline-block h-4 w-4 rounded-full bg-white transition-transform',
+                      formEnabled ? 'translate-x-6' : 'translate-x-1',
+                    ].join(' ')}
+                  />
+                </button>
+                <span className={['text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
                   {t.fieldEnabled}
-                </label>
+                </span>
               </div>
             </div>
 

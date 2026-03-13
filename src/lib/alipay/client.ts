@@ -92,6 +92,10 @@ export async function execute<T extends AlipayResponse>(
   const data = await parseAlipayJsonResponse<Record<string, unknown>>(response);
 
   // 支付宝响应格式：{ "alipay_trade_query_response": { ... }, "sign": "..." }
+  // TODO: 实现响应验签 — 需要从原始响应文本中提取 responseKey 对应的 JSON 子串，
+  // 使用 verifySign 配合 ALIPAY_PUBLIC_KEY 验证 data.sign。
+  // 当前未验签是因为需要保留原始响应文本（不能 JSON.parse 后再 stringify），
+  // 需要改造 parseAlipayJsonResponse 同时返回原始文本。
   const responseKey = method.replace(/\./g, '_') + '_response';
   const result = data[responseKey] as T | undefined;
 

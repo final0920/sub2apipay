@@ -6,7 +6,8 @@ const SENSITIVE_PATTERNS = ['KEY', 'SECRET', 'PASSWORD', 'PRIVATE'];
 
 function maskSensitiveValue(key: string, value: string): string {
   const isSensitive = SENSITIVE_PATTERNS.some((pattern) => key.toUpperCase().includes(pattern));
-  if (!isSensitive || value.length <= 4) return value;
+  if (!isSensitive) return value;
+  if (value.length <= 4) return '****';
   return '*'.repeat(value.length - 4) + value.slice(-4);
 }
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ configs: masked });
   } catch (error) {
-    console.error('Failed to get system configs:', error);
+    console.error('Failed to get system configs:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: '获取系统配置失败' }, { status: 500 });
   }
 }
@@ -39,10 +40,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '缺少必填字段: configs 数组' }, { status: 400 });
     }
 
+    const ALLOWED_CONFIG_KEYS = new Set([
+      'PRODUCT_NAME',
+      'ENABLED_PAYMENT_TYPES',
+      'RECHARGE_MIN_AMOUNT',
+      'RECHARGE_MAX_AMOUNT',
+      'DAILY_RECHARGE_LIMIT',
+      'ORDER_TIMEOUT_MINUTES',
+      'IFRAME_ALLOW_ORIGINS',
+    ]);
+
     // 校验每条配置
     for (const config of configs) {
       if (!config.key || config.value === undefined) {
         return NextResponse.json({ error: '每条配置必须包含 key 和 value' }, { status: 400 });
+      }
+      if (!ALLOWED_CONFIG_KEYS.has(config.key)) {
+        return NextResponse.json({ error: `不允许修改配置项: ${config.key}` }, { status: 400 });
       }
     }
 
@@ -57,7 +71,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, updated: configs.length });
   } catch (error) {
-    console.error('Failed to update system configs:', error);
+    console.error('Failed to update system configs:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: '更新系统配置失败' }, { status: 500 });
   }
 }
