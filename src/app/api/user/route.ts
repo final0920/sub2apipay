@@ -8,7 +8,6 @@ import { resolveLocale } from '@/lib/locale';
 import { getSystemConfig } from '@/lib/system-config';
 import { resolveEnabledPaymentTypes } from '@/lib/payment/resolve-enabled-types';
 
-
 export async function GET(request: NextRequest) {
   const locale = resolveLocale(request.nextUrl.searchParams.get('lang'));
   const userId = Number(request.nextUrl.searchParams.get('user_id'));
@@ -54,10 +53,7 @@ export async function GET(request: NextRequest) {
       return { enabledTypes, methodLimits, balanceDisabled: balanceDisabledVal === 'true' };
     });
 
-    const [user, { enabledTypes, methodLimits, balanceDisabled }] = await Promise.all([
-      getUser(userId),
-      configPromise,
-    ]);
+    const [user, { enabledTypes, methodLimits, balanceDisabled }] = await Promise.all([getUser(userId), configPromise]);
 
     // 收集 sublabel 覆盖
     const sublabelOverrides: Record<string, string> = {};
