@@ -3,19 +3,17 @@ import { z } from 'zod';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
 import { prisma } from '@/lib/db';
 
-const updateChannelSchema = z
-  .object({
-    group_id: z.number().int().positive().optional(),
-    name: z.string().min(1).max(100).optional(),
-    platform: z.string().min(1).max(50).optional(),
-    rate_multiplier: z.number().positive().optional(),
-    description: z.string().max(500).nullable().optional(),
-    models: z.array(z.string()).nullable().optional(),
-    features: z.record(z.string(), z.unknown()).nullable().optional(),
-    sort_order: z.number().int().min(0).optional(),
-    enabled: z.boolean().optional(),
-  })
-  .strict();
+const updateChannelSchema = z.object({
+  group_id: z.number().int().positive().optional(),
+  name: z.string().min(1).max(100).optional(),
+  platform: z.string().min(1).max(50).optional(),
+  rate_multiplier: z.number().positive().optional(),
+  description: z.string().max(500).nullable().optional(),
+  models: z.union([z.array(z.string()), z.string()]).nullable().optional(),
+  features: z.union([z.record(z.string(), z.unknown()), z.string()]).nullable().optional(),
+  sort_order: z.number().int().min(0).optional(),
+  enabled: z.boolean().optional(),
+});
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await verifyAdminToken(request))) return unauthorizedResponse(request);
