@@ -10,7 +10,7 @@ import { PlatformBadge, getPlatformStyle } from '@/lib/platform-style';
 
 interface Channel {
   id: string;
-  groupId: number;
+  groupId: number | null;
   name: string;
   platform: string;
   rateMultiplier: number;
@@ -112,6 +112,16 @@ function getTexts(locale: Locale) {
         savingConfig: 'Saving...',
         configSaved: 'Configuration saved',
         configSaveFailed: 'Failed to save configuration',
+        cancelRateLimit: 'Order Cancel Rate Limit',
+        cancelRateLimitWindow: 'Window',
+        cancelRateLimitUnit: 'Unit',
+        cancelRateLimitMax: 'Max Cancellations',
+        cancelRateLimitUnitMinute: 'Minutes',
+        cancelRateLimitUnitHour: 'Hours',
+        cancelRateLimitUnitDay: 'Days',
+        maxPendingOrders: 'Max Pending Orders',
+        cancelRateLimitHint: (w: string, u: string, m: string) =>
+          `Within ${w} ${u === 'minute' ? 'minute(s)' : u === 'day' ? 'day(s)' : 'hour(s)'}, max ${m} cancellation(s)`,
       }
     : {
         missingToken: '缺少管理员凭证',
@@ -174,6 +184,16 @@ function getTexts(locale: Locale) {
         savingConfig: '保存中...',
         configSaved: '配置已保存',
         configSaveFailed: '保存配置失败',
+        cancelRateLimit: '订单取消频率限制',
+        cancelRateLimitWindow: '窗口',
+        cancelRateLimitUnit: '周期单位',
+        cancelRateLimitMax: '最大取消次数',
+        cancelRateLimitUnitMinute: '分钟',
+        cancelRateLimitUnitHour: '小时',
+        cancelRateLimitUnitDay: '天',
+        maxPendingOrders: '最多可存在支付中订单',
+        cancelRateLimitHint: (w: string, u: string, m: string) =>
+          `${w} ${u === 'minute' ? '分钟' : u === 'day' ? '天' : '小时'}内最多可取消 ${m} 次`,
       };
 }
 
@@ -239,6 +259,11 @@ function ChannelsContent() {
   const [rcPrefix, setRcPrefix] = useState('');
   const [rcSuffix, setRcSuffix] = useState('');
   const [rcBalanceEnabled, setRcBalanceEnabled] = useState(true);
+  const [rcCancelRateLimitEnabled, setRcCancelRateLimitEnabled] = useState(false);
+  const [rcCancelRateLimitWindow, setRcCancelRateLimitWindow] = useState('1');
+  const [rcCancelRateLimitUnit, setRcCancelRateLimitUnit] = useState('hour');
+  const [rcCancelRateLimitMax, setRcCancelRateLimitMax] = useState('3');
+  const [rcMaxPendingOrders, setRcMaxPendingOrders] = useState('3');
   const [rcSaving, setRcSaving] = useState(false);
 
   // Sync modal state
@@ -283,6 +308,11 @@ function ChannelsContent() {
           if (c.key === 'PRODUCT_NAME_PREFIX') setRcPrefix(c.value);
           if (c.key === 'PRODUCT_NAME_SUFFIX') setRcSuffix(c.value);
           if (c.key === 'BALANCE_PAYMENT_DISABLED') setRcBalanceEnabled(c.value !== 'true');
+          if (c.key === 'CANCEL_RATE_LIMIT_ENABLED') setRcCancelRateLimitEnabled(c.value === 'true');
+          if (c.key === 'CANCEL_RATE_LIMIT_WINDOW') setRcCancelRateLimitWindow(c.value || '1');
+          if (c.key === 'CANCEL_RATE_LIMIT_UNIT') setRcCancelRateLimitUnit(c.value || 'hour');
+          if (c.key === 'CANCEL_RATE_LIMIT_MAX') setRcCancelRateLimitMax(c.value || '3');
+          if (c.key === 'MAX_PENDING_ORDERS') setRcMaxPendingOrders(c.value || '3');
         }
       }
     } catch {
@@ -309,6 +339,36 @@ function ChannelsContent() {
               value: rcBalanceEnabled ? 'false' : 'true',
               group: 'payment',
               label: '余额充值禁用',
+            },
+            {
+              key: 'CANCEL_RATE_LIMIT_ENABLED',
+              value: rcCancelRateLimitEnabled ? 'true' : 'false',
+              group: 'payment',
+              label: '订单取消频率限制',
+            },
+            {
+              key: 'CANCEL_RATE_LIMIT_WINDOW',
+              value: rcCancelRateLimitWindow,
+              group: 'payment',
+              label: '频率限制窗口',
+            },
+            {
+              key: 'CANCEL_RATE_LIMIT_UNIT',
+              value: rcCancelRateLimitUnit,
+              group: 'payment',
+              label: '频率限制周期单位',
+            },
+            {
+              key: 'CANCEL_RATE_LIMIT_MAX',
+              value: rcCancelRateLimitMax,
+              group: 'payment',
+              label: '频率限制最大次数',
+            },
+            {
+              key: 'MAX_PENDING_ORDERS',
+              value: rcMaxPendingOrders,
+              group: 'payment',
+              label: '最多可存在支付中订单',
             },
           ],
         }),
@@ -352,7 +412,7 @@ function ChannelsContent() {
   const openEditModal = (channel: Channel) => {
     setEditingChannel(channel);
     setForm({
-      group_id: channel.groupId,
+      group_id: channel.groupId ?? '',
       name: channel.name,
       platform: channel.platform,
       rate_multiplier: String(channel.rateMultiplier),
@@ -371,12 +431,11 @@ function ChannelsContent() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || form.group_id === '' || !form.rate_multiplier) return;
+    if (!form.name.trim() || !form.rate_multiplier) return;
     setSaving(true);
     setError('');
 
-    const body = {
-      group_id: Number(form.group_id),
+    const body: Record<string, unknown> = {
       name: form.name.trim(),
       platform: form.platform,
       rate_multiplier: parseFloat(form.rate_multiplier),
@@ -386,6 +445,11 @@ function ChannelsContent() {
       sort_order: parseInt(form.sort_order, 10) || 0,
       enabled: form.enabled,
     };
+    if (form.group_id !== '') {
+      body.group_id = Number(form.group_id);
+    } else {
+      body.group_id = null;
+    }
 
     try {
       const url = editingChannel ? `/api/admin/channels/${editingChannel.id}` : '/api/admin/channels';
@@ -480,7 +544,7 @@ function ChannelsContent() {
     setSyncSelected(new Set());
   };
 
-  const existingGroupIds = new Set(channels.map((c) => c.groupId));
+  const existingGroupIds = new Set(channels.map((c) => c.groupId).filter((id): id is number => id !== null));
 
   const toggleSyncGroup = (id: number) => {
     setSyncSelected((prev) => {
@@ -671,6 +735,89 @@ function ChannelsContent() {
               {t.enableBalanceRecharge}
             </span>
           </div>
+        </div>
+
+        {/* 最多可存在支付中订单 */}
+        <div className="mt-3">
+          <label className={labelCls}>{t.maxPendingOrders}</label>
+          <input
+            type="number"
+            min="1"
+            max="99"
+            value={rcMaxPendingOrders}
+            onChange={(e) => setRcMaxPendingOrders(e.target.value)}
+            className={[inputCls, 'w-24'].join(' ')}
+          />
+        </div>
+
+        {/* 订单取消频率限制 */}
+        <div className="mt-3">
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              type="button"
+              onClick={() => setRcCancelRateLimitEnabled(!rcCancelRateLimitEnabled)}
+              className={[
+                'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                rcCancelRateLimitEnabled ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
+                  rcCancelRateLimitEnabled ? 'translate-x-4.5' : 'translate-x-0.5',
+                ].join(' ')}
+              />
+            </button>
+            <span className={['text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+              {t.cancelRateLimit}
+            </span>
+          </div>
+          {rcCancelRateLimitEnabled && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className={labelCls}>{t.cancelRateLimitWindow}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="999"
+                    value={rcCancelRateLimitWindow}
+                    onChange={(e) => setRcCancelRateLimitWindow(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.cancelRateLimitUnit}</label>
+                  <select
+                    value={rcCancelRateLimitUnit}
+                    onChange={(e) => setRcCancelRateLimitUnit(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="minute">{t.cancelRateLimitUnitMinute}</option>
+                    <option value="hour">{t.cancelRateLimitUnitHour}</option>
+                    <option value="day">{t.cancelRateLimitUnitDay}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>{t.cancelRateLimitMax}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="999"
+                    value={rcCancelRateLimitMax}
+                    onChange={(e) => setRcCancelRateLimitMax(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <p className={['mt-1 text-xs', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+                {t.cancelRateLimitHint(rcCancelRateLimitWindow, rcCancelRateLimitUnit, rcCancelRateLimitMax)}
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={saveRechargeConfig}
@@ -726,7 +873,7 @@ function ChannelsContent() {
                     <td className={`px-4 py-3 font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                       <div>{channel.name}</div>
                       <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Group #{channel.groupId}
+                        {channel.groupId !== null ? `Group #${channel.groupId}` : '—'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -736,7 +883,13 @@ function ChannelsContent() {
                       {channel.rateMultiplier}x
                     </td>
                     <td className="px-4 py-3 text-center">
-                      {channel.groupExists ? (
+                      {channel.groupId === null ? (
+                        <span
+                          className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${isDark ? 'bg-slate-700 text-slate-500' : 'bg-slate-100 text-slate-400'}`}
+                        >
+                          —
+                        </span>
+                      ) : channel.groupExists ? (
                         <span
                           className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${isDark ? 'bg-emerald-900/40 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}
                         >
@@ -833,19 +986,17 @@ function ChannelsContent() {
             </h2>
 
             <div className="space-y-4">
-              {/* Group ID (only for create) */}
-              {!editingChannel && (
-                <div>
-                  <label className={labelCls}>{t.fieldGroupId}</label>
-                  <input
-                    type="number"
-                    value={form.group_id}
-                    onChange={(e) => setForm({ ...form, group_id: e.target.value ? Number(e.target.value) : '' })}
-                    className={inputCls}
-                    required
-                  />
-                </div>
-              )}
+              {/* Group ID (optional) */}
+              <div>
+                <label className={labelCls}>{t.fieldGroupId}</label>
+                <input
+                  type="number"
+                  value={form.group_id}
+                  onChange={(e) => setForm({ ...form, group_id: e.target.value ? Number(e.target.value) : '' })}
+                  className={inputCls}
+                  placeholder={locale === 'en' ? 'Optional' : '可选'}
+                />
+              </div>
 
               {/* Name */}
               <div>
@@ -972,7 +1123,7 @@ function ChannelsContent() {
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving || !form.name.trim() || form.group_id === '' || !form.rate_multiplier}
+                disabled={saving || !form.name.trim() || !form.rate_multiplier}
                 className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? t.saving : t.save}

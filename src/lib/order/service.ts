@@ -22,7 +22,7 @@ import { getBizDayStartUTC } from '@/lib/time/biz-day';
 import { buildOrderResultUrl, createOrderStatusAccessToken } from '@/lib/order/status-access';
 import { getSystemConfig, getSystemConfigs } from '@/lib/system-config';
 
-const MAX_PENDING_ORDERS = 3;
+const DEFAULT_MAX_PENDING_ORDERS = 3;
 /** Decimal(10,2) 允许的最大金额 */
 export const MAX_AMOUNT = 99999999.99;
 
@@ -148,19 +148,25 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
   const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
 
+  // 读取最大支付中订单数配置
+  const maxPendingConfig = await getSystemConfig('MAX_PENDING_ORDERS');
+  const maxPendingOrders = maxPendingConfig
+    ? parseInt(maxPendingConfig, 10) || DEFAULT_MAX_PENDING_ORDERS
+    : DEFAULT_MAX_PENDING_ORDERS;
+
   // 将限额校验与订单创建放在同一个 serializable 事务中，防止并发突破限额
   const order = await prisma.$transaction(async (tx) => {
     // 待支付订单数限制
     const pendingCount = await tx.order.count({
       where: { userId: input.userId, status: ORDER_STATUS.PENDING },
     });
-    if (pendingCount >= MAX_PENDING_ORDERS) {
+    if (pendingCount >= maxPendingOrders) {
       throw new OrderError(
         'TOO_MANY_PENDING',
         message(
           locale,
-          `待支付订单过多（最多 ${MAX_PENDING_ORDERS} 笔）`,
-          `Too many pending orders (${MAX_PENDING_ORDERS})`,
+          `待支付订单过多（最多 ${maxPendingOrders} 笔）`,
+          `Too many pending orders (${maxPendingOrders})`,
         ),
         429,
       );
@@ -452,6 +458,53 @@ export async function cancelOrder(orderId: string, userId: number, locale: Local
   if (order.userId !== userId) throw new OrderError('FORBIDDEN', message(locale, '无权操作该订单', 'Forbidden'), 403);
   if (order.status !== ORDER_STATUS.PENDING)
     throw new OrderError('INVALID_STATUS', message(locale, '订单当前状态不可取消', 'Order cannot be cancelled'), 400);
+
+  // 取消频率限制检查
+  const rateLimitConfigs = await getSystemConfigs([
+    'CANCEL_RATE_LIMIT_ENABLED',
+    'CANCEL_RATE_LIMIT_WINDOW',
+    'CANCEL_RATE_LIMIT_UNIT',
+    'CANCEL_RATE_LIMIT_MAX',
+  ]);
+  if (rateLimitConfigs['CANCEL_RATE_LIMIT_ENABLED'] === 'true') {
+    const window = parseInt(rateLimitConfigs['CANCEL_RATE_LIMIT_WINDOW'] || '0', 10);
+    const maxCount = parseInt(rateLimitConfigs['CANCEL_RATE_LIMIT_MAX'] || '0', 10);
+    const unit = rateLimitConfigs['CANCEL_RATE_LIMIT_UNIT'] || 'hour';
+    if (window > 0 && maxCount > 0) {
+      const unitMs = unit === 'minute' ? 60_000 : unit === 'day' ? 86_400_000 : 3_600_000;
+      const windowStart = new Date(Date.now() - window * unitMs);
+      const recentCancelCount = await prisma.auditLog.count({
+        where: {
+          action: 'ORDER_CANCELLED',
+          operator: `user:${userId}`,
+          createdAt: { gte: windowStart },
+        },
+      });
+      if (recentCancelCount >= maxCount) {
+        const unitLabel =
+          locale === 'en'
+            ? unit === 'minute'
+              ? 'minute(s)'
+              : unit === 'day'
+                ? 'day(s)'
+                : 'hour(s)'
+            : unit === 'minute'
+              ? '分钟'
+              : unit === 'day'
+                ? '天'
+                : '小时';
+        throw new OrderError(
+          'CANCEL_RATE_LIMITED',
+          message(
+            locale,
+            `取消订单过于频繁，${window} ${unitLabel}内最多可取消 ${maxCount} 次`,
+            `Too many cancellations. Maximum ${maxCount} cancellations per ${window} ${unitLabel}`,
+          ),
+          429,
+        );
+      }
+    }
+  }
 
   return cancelOrderCore({
     orderId: order.id,

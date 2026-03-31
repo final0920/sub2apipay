@@ -47,13 +47,22 @@ export async function GET(request: NextRequest) {
     const configPromise = Promise.all([
       getSystemConfig('ENABLED_PAYMENT_TYPES'),
       getSystemConfig('BALANCE_PAYMENT_DISABLED'),
-    ]).then(async ([configuredPaymentTypesRaw, balanceDisabledVal]) => {
+      getSystemConfig('MAX_PENDING_ORDERS'),
+    ]).then(async ([configuredPaymentTypesRaw, balanceDisabledVal, maxPendingVal]) => {
       const enabledTypes = resolveEnabledPaymentTypes(supportedTypes, configuredPaymentTypesRaw);
       const methodLimits = await queryMethodLimits(enabledTypes);
-      return { enabledTypes, methodLimits, balanceDisabled: balanceDisabledVal === 'true' };
+      return {
+        enabledTypes,
+        methodLimits,
+        balanceDisabled: balanceDisabledVal === 'true',
+        maxPendingOrders: maxPendingVal ? parseInt(maxPendingVal, 10) || 3 : 3,
+      };
     });
 
-    const [user, { enabledTypes, methodLimits, balanceDisabled }] = await Promise.all([getUser(userId), configPromise]);
+    const [user, { enabledTypes, methodLimits, balanceDisabled, maxPendingOrders }] = await Promise.all([
+      getUser(userId),
+      configPromise,
+    ]);
 
     // 收集 sublabel 覆盖
     const sublabelOverrides: Record<string, string> = {};
@@ -98,6 +107,7 @@ export async function GET(request: NextRequest) {
         stripePublishableKey:
           enabledTypes.includes('stripe') && env.STRIPE_PUBLISHABLE_KEY ? env.STRIPE_PUBLISHABLE_KEY : null,
         balanceDisabled,
+        maxPendingOrders,
         sublabelOverrides: Object.keys(sublabelOverrides).length > 0 ? sublabelOverrides : null,
       },
     });

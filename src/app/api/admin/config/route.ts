@@ -50,6 +50,11 @@ export async function PUT(request: NextRequest) {
       'PRODUCT_NAME_PREFIX',
       'PRODUCT_NAME_SUFFIX',
       'BALANCE_PAYMENT_DISABLED',
+      'CANCEL_RATE_LIMIT_ENABLED',
+      'CANCEL_RATE_LIMIT_WINDOW',
+      'CANCEL_RATE_LIMIT_UNIT',
+      'CANCEL_RATE_LIMIT_MAX',
+      'MAX_PENDING_ORDERS',
     ]);
 
     // 校验每条配置

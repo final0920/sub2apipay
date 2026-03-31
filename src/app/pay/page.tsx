@@ -44,6 +44,7 @@ interface AppConfig {
   helpText?: string | null;
   stripePublishableKey?: string | null;
   balanceDisabled?: boolean;
+  maxPendingOrders?: number;
 }
 
 function PayContent() {
@@ -132,7 +133,7 @@ function PayContent() {
     );
   };
 
-  const MAX_PENDING = 3;
+  const MAX_PENDING = config.maxPendingOrders ?? 3;
   const pendingBlocked = pendingCount >= MAX_PENDING;
 
   // R6: 余额充值是否被禁用
@@ -213,6 +214,7 @@ function PayContent() {
             helpText: cfgData.config.helpText ?? null,
             stripePublishableKey: cfgData.config.stripePublishableKey ?? null,
             balanceDisabled: cfgData.config.balanceDisabled ?? false,
+            maxPendingOrders: cfgData.config.maxPendingOrders ?? 3,
           });
           if (cfgData.config.sublabelOverrides) {
             applySublabelOverrides(cfgData.config.sublabelOverrides);
