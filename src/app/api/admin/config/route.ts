@@ -57,6 +57,7 @@ export async function PUT(request: NextRequest) {
       'CANCEL_RATE_LIMIT_WINDOW_MODE',
       'MAX_PENDING_ORDERS',
       'LOAD_BALANCE_STRATEGY',
+      'ENABLED_PROVIDERS',
     ]);
 
     // 校验每条配置

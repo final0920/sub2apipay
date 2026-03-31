@@ -14,7 +14,6 @@ function getTexts(locale: Locale) {
         missingTokenHint: 'Please access the admin page from the Sub2API platform.',
         title: 'Payment Config',
         subtitle: 'Configure payment providers and settings',
-        // Basic config
         basicConfig: 'Basic Settings',
         basicConfigHint: 'Recharge, order and environment configuration',
         productNamePrefix: 'Product Name Prefix',
@@ -36,19 +35,16 @@ function getTexts(locale: Locale) {
         cancelRateLimitWindowModeRolling: 'Rolling',
         cancelRateLimitWindowModeFixed: 'Fixed',
         cancelRateLimitHint: (w: string, u: string, m: string, mode: string) =>
-          `Within ${w} ${u === 'minute' ? 'minute(s)' : u === 'day' ? 'day(s)' : 'hour(s)'}, max ${m} cancellation(s) (${mode === 'fixed' ? 'fixed window' : 'rolling window'})`,
-        // Override env
+          `Within ${w} ${u === 'minute' ? 'min' : u === 'day' ? 'day' : 'hr'}, max ${m} cancel(s) (${mode === 'fixed' ? 'fixed' : 'rolling'})`,
         overrideEnvConfig: 'Override Env Config',
         overrideEnvHint: 'When enabled, database settings override environment variables',
-        enabledPaymentTypes: 'Enabled Payment Types',
+        enabledProviders: 'Enabled Provider Types',
         minRechargeAmount: 'Min Recharge Amount',
         maxRechargeAmount: 'Max Recharge Amount',
         dailyRechargeLimit: 'Daily Limit (0=unlimited)',
         orderTimeoutMinutes: 'Order Timeout (min)',
         loadingEnvDefaults: 'Loading defaults...',
-        // Provider management
         providerManagement: 'Provider Management',
-        providerManagementHint: 'Add and manage payment provider instances',
         addInstance: 'Add Instance',
         editInstance: 'Edit Instance',
         instanceName: 'Instance Name',
@@ -60,7 +56,7 @@ function getTexts(locale: Locale) {
         loadBalanceStrategy: 'Load Balance',
         strategyRoundRobin: 'Round Robin',
         strategyLeastAmount: 'Least Daily Amount',
-        noInstances: 'No instances yet',
+        noInstances: 'No instances configured yet.',
         deleteInstanceConfirm: 'Are you sure you want to delete this instance?',
         todayAmount: 'Today',
         instanceSortOrder: 'Sort Order',
@@ -70,16 +66,12 @@ function getTexts(locale: Locale) {
         instanceSaveFailed: 'Failed to save instance',
         instanceDeleteFailed: 'Failed to delete instance',
         allChannels: 'All Channels',
-        noProviderEnabled: 'No provider types enabled. Please enable payment types in Basic Settings first.',
-        collapse: 'Collapse',
-        expand: 'Expand',
       }
     : {
         missingToken: '缺少管理员凭证',
         missingTokenHint: '请从 Sub2API 平台正确访问管理页面',
         title: '支付配置',
         subtitle: '管理支付服务商与相关设置',
-        // Basic config
         basicConfig: '基础配置',
         basicConfigHint: '充值、订单与环境变量覆盖配置',
         productNamePrefix: '商品名前缀',
@@ -102,18 +94,15 @@ function getTexts(locale: Locale) {
         cancelRateLimitWindowModeFixed: '固定',
         cancelRateLimitHint: (w: string, u: string, m: string, mode: string) =>
           `${w} ${u === 'minute' ? '分钟' : u === 'day' ? '天' : '小时'}内最多可取消 ${m} 次（${mode === 'fixed' ? '固定窗口' : '滚动窗口'}）`,
-        // Override env
         overrideEnvConfig: '覆盖环境变量配置',
         overrideEnvHint: '开启后，数据库配置将覆盖环境变量',
-        enabledPaymentTypes: '启用的支付类型',
+        enabledProviders: '启用的服务商类型',
         minRechargeAmount: '最小充值金额',
         maxRechargeAmount: '最大充值金额',
         dailyRechargeLimit: '每日限额（0=不限）',
         orderTimeoutMinutes: '订单超时（分钟）',
         loadingEnvDefaults: '加载默认值...',
-        // Provider management
         providerManagement: '服务商管理',
-        providerManagementHint: '添加和管理支付服务商实例',
         addInstance: '添加实例',
         editInstance: '编辑实例',
         instanceName: '实例名称',
@@ -125,7 +114,7 @@ function getTexts(locale: Locale) {
         loadBalanceStrategy: '负载策略',
         strategyRoundRobin: '轮询',
         strategyLeastAmount: '基于已支付金额',
-        noInstances: '暂无实例',
+        noInstances: '暂无实例，点击上方「添加实例」配置服务商。',
         deleteInstanceConfirm: '确定删除该实例？',
         todayAmount: '今日',
         instanceSortOrder: '排序',
@@ -135,15 +124,12 @@ function getTexts(locale: Locale) {
         instanceSaveFailed: '保存实例失败',
         instanceDeleteFailed: '删除实例失败',
         allChannels: '全部渠道',
-        noProviderEnabled: '未启用任何服务商类型，请先在基础配置中启用支付类型。',
-        collapse: '收起',
-        expand: '展开',
       };
 }
 
-// ── Provider & payment type display names ──
+// ── Constants ──
 
-const ALL_PAYMENT_TYPES = ['alipay', 'wxpay', 'stripe'] as const;
+const ALL_PROVIDER_KEYS = ['easypay', 'alipay', 'wxpay', 'stripe'] as const;
 
 const PAYMENT_TYPE_LABELS: Record<string, { zh: string; en: string }> = {
   alipay: { zh: '支付宝', en: 'Alipay' },
@@ -153,31 +139,17 @@ const PAYMENT_TYPE_LABELS: Record<string, { zh: string; en: string }> = {
 
 const PROVIDER_LABELS: Record<string, { zh: string; en: string }> = {
   easypay: { zh: '易支付', en: 'EasyPay' },
-  alipay: { zh: '支付宝直连', en: 'Alipay Direct' },
-  wxpay: { zh: '微信支付直连', en: 'WeChat Pay Direct' },
+  alipay: { zh: '支付宝官方', en: 'Alipay Official' },
+  wxpay: { zh: '微信官方', en: 'WeChat Official' },
   stripe: { zh: 'Stripe', en: 'Stripe' },
 };
 
-// Which payment types each provider can support
 const PROVIDER_SUPPORTED_TYPES: Record<string, string[]> = {
   easypay: ['alipay', 'wxpay'],
   alipay: ['alipay'],
   wxpay: ['wxpay'],
   stripe: ['stripe'],
 };
-
-/** Given enabled payment types, derive which provider keys are relevant */
-function getEnabledProviderKeys(enabledTypes: string[]): string[] {
-  const keys = new Set<string>();
-  for (const type of enabledTypes) {
-    for (const [providerKey, supportedTypes] of Object.entries(PROVIDER_SUPPORTED_TYPES)) {
-      if (supportedTypes.includes(type)) keys.add(providerKey);
-    }
-  }
-  return Object.keys(PROVIDER_LABELS).filter((k) => keys.has(k)); // preserve order
-}
-
-// ── Provider config field definitions ──
 
 interface ConfigFieldDef {
   key: string;
@@ -257,7 +229,7 @@ function PaymentConfigContent() {
 
   const [error, setError] = useState('');
 
-  // Basic config state
+  // Basic config
   const [rcPrefix, setRcPrefix] = useState('');
   const [rcSuffix, setRcSuffix] = useState('');
   const [rcBalanceEnabled, setRcBalanceEnabled] = useState(true);
@@ -270,9 +242,10 @@ function PaymentConfigContent() {
   const [rcSaving, setRcSaving] = useState(false);
   const [rcLoadBalanceStrategy, setRcLoadBalanceStrategy] = useState('round-robin');
 
-  // Override env config state
+  // Override env
   const [rcOverrideEnv, setRcOverrideEnv] = useState(false);
   const [rcOverrideSaved, setRcOverrideSaved] = useState(false);
+  const [rcEnabledProviders, setRcEnabledProviders] = useState('');
   const [rcEnabledPaymentTypes, setRcEnabledPaymentTypes] = useState('');
   const [rcMinAmount, setRcMinAmount] = useState('');
   const [rcMaxAmount, setRcMaxAmount] = useState('');
@@ -280,10 +253,7 @@ function PaymentConfigContent() {
   const [rcOrderTimeout, setRcOrderTimeout] = useState('');
   const [loadingEnvDefaults, setLoadingEnvDefaults] = useState(false);
 
-  // Env defaults (for when override is off)
-  const [envAvailableTypes, setEnvAvailableTypes] = useState<string[]>([]);
-
-  // Provider instances state
+  // Instances
   const [instances, setInstances] = useState<ProviderInstanceData[]>([]);
   const [instanceModalOpen, setInstanceModalOpen] = useState(false);
   const [editingInstance, setEditingInstance] = useState<ProviderInstanceData | null>(null);
@@ -296,108 +266,58 @@ function PaymentConfigContent() {
     supportedTypes: [],
   });
   const [instanceSaving, setInstanceSaving] = useState(false);
-  const [collapsedProviders, setCollapsedProviders] = useState<Set<string>>(new Set());
 
-  // Derive enabled payment types and provider keys
-  const enabledPaymentTypesList = useMemo(() => {
-    if (rcOverrideEnv) {
-      return rcEnabledPaymentTypes
+  const enabledProviderKeys = useMemo(
+    () =>
+      rcEnabledProviders
         .split(',')
         .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    return envAvailableTypes;
-  }, [rcOverrideEnv, rcEnabledPaymentTypes, envAvailableTypes]);
+        .filter((k) => k in PROVIDER_LABELS),
+    [rcEnabledProviders],
+  );
 
-  const enabledProviderKeys = useMemo(() => getEnabledProviderKeys(enabledPaymentTypesList), [enabledPaymentTypesList]);
+  // ── Data fetching ──
 
-  // Fetch config
   const fetchConfig = useCallback(async () => {
     if (!token) return;
     try {
       const res = await fetch(`/api/admin/config?token=${encodeURIComponent(token)}`);
-      if (res.ok) {
-        const data = await res.json();
-        const configs: { key: string; value: string }[] = data.configs ?? [];
-        const overrideKeys = [
-          'ENABLED_PAYMENT_TYPES',
-          'RECHARGE_MIN_AMOUNT',
-          'RECHARGE_MAX_AMOUNT',
-          'DAILY_RECHARGE_LIMIT',
-          'ORDER_TIMEOUT_MINUTES',
-        ];
-        let hasOverride = false;
-        for (const c of configs) {
-          if (c.key === 'PRODUCT_NAME_PREFIX') setRcPrefix(c.value);
-          if (c.key === 'PRODUCT_NAME_SUFFIX') setRcSuffix(c.value);
-          if (c.key === 'BALANCE_PAYMENT_DISABLED') setRcBalanceEnabled(c.value !== 'true');
-          if (c.key === 'CANCEL_RATE_LIMIT_ENABLED') setRcCancelRateLimitEnabled(c.value === 'true');
-          if (c.key === 'CANCEL_RATE_LIMIT_WINDOW') setRcCancelRateLimitWindow(c.value || '1');
-          if (c.key === 'CANCEL_RATE_LIMIT_UNIT') setRcCancelRateLimitUnit(c.value || 'day');
-          if (c.key === 'CANCEL_RATE_LIMIT_MAX') setRcCancelRateLimitMax(c.value || '10');
-          if (c.key === 'CANCEL_RATE_LIMIT_WINDOW_MODE') setRcCancelRateLimitWindowMode(c.value || 'rolling');
-          if (c.key === 'MAX_PENDING_ORDERS') setRcMaxPendingOrders(c.value || '3');
-          if (c.key === 'ENABLED_PAYMENT_TYPES') setRcEnabledPaymentTypes(c.value);
-          if (c.key === 'RECHARGE_MIN_AMOUNT') setRcMinAmount(c.value);
-          if (c.key === 'RECHARGE_MAX_AMOUNT') setRcMaxAmount(c.value);
-          if (c.key === 'DAILY_RECHARGE_LIMIT') setRcDailyLimit(c.value);
-          if (c.key === 'ORDER_TIMEOUT_MINUTES') setRcOrderTimeout(c.value);
-          if (c.key === 'LOAD_BALANCE_STRATEGY') setRcLoadBalanceStrategy(c.value || 'round-robin');
-          if (overrideKeys.includes(c.key)) hasOverride = true;
-        }
-        setRcOverrideEnv(hasOverride);
-        setRcOverrideSaved(hasOverride);
+      if (!res.ok) return;
+      const data = await res.json();
+      const configs: { key: string; value: string }[] = data.configs ?? [];
+      const overrideKeys = [
+        'ENABLED_PAYMENT_TYPES',
+        'RECHARGE_MIN_AMOUNT',
+        'RECHARGE_MAX_AMOUNT',
+        'DAILY_RECHARGE_LIMIT',
+        'ORDER_TIMEOUT_MINUTES',
+      ];
+      let hasOverride = false;
+      for (const c of configs) {
+        if (c.key === 'PRODUCT_NAME_PREFIX') setRcPrefix(c.value);
+        if (c.key === 'PRODUCT_NAME_SUFFIX') setRcSuffix(c.value);
+        if (c.key === 'BALANCE_PAYMENT_DISABLED') setRcBalanceEnabled(c.value !== 'true');
+        if (c.key === 'CANCEL_RATE_LIMIT_ENABLED') setRcCancelRateLimitEnabled(c.value === 'true');
+        if (c.key === 'CANCEL_RATE_LIMIT_WINDOW') setRcCancelRateLimitWindow(c.value || '1');
+        if (c.key === 'CANCEL_RATE_LIMIT_UNIT') setRcCancelRateLimitUnit(c.value || 'day');
+        if (c.key === 'CANCEL_RATE_LIMIT_MAX') setRcCancelRateLimitMax(c.value || '10');
+        if (c.key === 'CANCEL_RATE_LIMIT_WINDOW_MODE') setRcCancelRateLimitWindowMode(c.value || 'rolling');
+        if (c.key === 'MAX_PENDING_ORDERS') setRcMaxPendingOrders(c.value || '3');
+        if (c.key === 'ENABLED_PAYMENT_TYPES') setRcEnabledPaymentTypes(c.value);
+        if (c.key === 'ENABLED_PROVIDERS') setRcEnabledProviders(c.value);
+        if (c.key === 'RECHARGE_MIN_AMOUNT') setRcMinAmount(c.value);
+        if (c.key === 'RECHARGE_MAX_AMOUNT') setRcMaxAmount(c.value);
+        if (c.key === 'DAILY_RECHARGE_LIMIT') setRcDailyLimit(c.value);
+        if (c.key === 'ORDER_TIMEOUT_MINUTES') setRcOrderTimeout(c.value);
+        if (c.key === 'LOAD_BALANCE_STRATEGY') setRcLoadBalanceStrategy(c.value || 'round-robin');
+        if (overrideKeys.includes(c.key)) hasOverride = true;
       }
+      setRcOverrideEnv(hasOverride);
+      setRcOverrideSaved(hasOverride);
     } catch {
       /* ignore */
     }
   }, [token]);
-
-  const fetchEnvDefaults = useCallback(async () => {
-    if (!token) return;
-    setLoadingEnvDefaults(true);
-    try {
-      const res = await fetch(`/api/admin/config/env-defaults?token=${encodeURIComponent(token)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.availablePaymentTypes) setEnvAvailableTypes(data.availablePaymentTypes);
-        return data;
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setLoadingEnvDefaults(false);
-    }
-    return null;
-  }, [token]);
-
-  const handleOverrideEnvToggle = async () => {
-    if (rcOverrideSaved) return;
-    const newValue = !rcOverrideEnv;
-    setRcOverrideEnv(newValue);
-    if (newValue && !rcEnabledPaymentTypes && !rcMinAmount) {
-      const data = await fetchEnvDefaults();
-      if (data) {
-        const d = data.defaults;
-        setRcEnabledPaymentTypes(d.ENABLED_PAYMENT_TYPES || '');
-        setRcMinAmount(d.RECHARGE_MIN_AMOUNT || '1');
-        setRcMaxAmount(d.RECHARGE_MAX_AMOUNT || '1000');
-        setRcDailyLimit(d.DAILY_RECHARGE_LIMIT || '10000');
-        setRcOrderTimeout(d.ORDER_TIMEOUT_MINUTES || '5');
-      }
-    }
-  };
-
-  const togglePaymentType = (type: string) => {
-    const current = rcEnabledPaymentTypes
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const next = current.includes(type) ? current.filter((t) => t !== type) : [...current, type];
-    setRcEnabledPaymentTypes(next.join(','));
-  };
-
-  // ── Provider Instances ──
 
   const fetchInstances = useCallback(async () => {
     if (!token) return;
@@ -412,6 +332,56 @@ function PaymentConfigContent() {
     }
   }, [token]);
 
+  useEffect(() => {
+    fetchConfig();
+    fetchInstances();
+  }, [fetchConfig, fetchInstances]);
+
+  // ── Override env toggle ──
+
+  const handleOverrideEnvToggle = async () => {
+    if (rcOverrideSaved) return;
+    setRcOverrideEnv(true);
+    setLoadingEnvDefaults(true);
+    try {
+      const res = await fetch(`/api/admin/config/env-defaults?token=${encodeURIComponent(token)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const d = data.defaults;
+        const configuredProviders = (data.providers || [])
+          .filter((p: { configured: boolean }) => p.configured)
+          .map((p: { key: string }) => p.key);
+        setRcEnabledProviders(configuredProviders.join(','));
+        setRcEnabledPaymentTypes(d.ENABLED_PAYMENT_TYPES || '');
+        setRcMinAmount(d.RECHARGE_MIN_AMOUNT || '1');
+        setRcMaxAmount(d.RECHARGE_MAX_AMOUNT || '1000');
+        setRcDailyLimit(d.DAILY_RECHARGE_LIMIT || '10000');
+        setRcOrderTimeout(d.ORDER_TIMEOUT_MINUTES || '5');
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingEnvDefaults(false);
+    }
+  };
+
+  const toggleProvider = (key: string) => {
+    const current = rcEnabledProviders
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    setRcEnabledProviders(next.join(','));
+    // Auto-derive enabled payment types
+    const derivedTypes = new Set<string>();
+    for (const pk of next) {
+      for (const pt of PROVIDER_SUPPORTED_TYPES[pk] || []) derivedTypes.add(pt);
+    }
+    setRcEnabledPaymentTypes(Array.from(derivedTypes).join(','));
+  };
+
+  // ── Instance CRUD ──
+
   const saveInstance = async () => {
     setInstanceSaving(true);
     setError('');
@@ -419,14 +389,9 @@ function PaymentConfigContent() {
       const url = editingInstance
         ? `/api/admin/provider-instances/${editingInstance.id}`
         : '/api/admin/provider-instances';
-      const method = editingInstance ? 'PUT' : 'POST';
-
       const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        method: editingInstance ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           providerKey: instanceForm.providerKey,
           name: instanceForm.name.trim(),
@@ -436,13 +401,11 @@ function PaymentConfigContent() {
           supportedTypes: instanceForm.supportedTypes.join(','),
         }),
       });
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setError(data.error || t.instanceSaveFailed);
         return;
       }
-
       setInstanceModalOpen(false);
       setEditingInstance(null);
       fetchInstances();
@@ -485,8 +448,8 @@ function PaymentConfigContent() {
     setInstanceModalOpen(true);
   };
 
-  const openCreateInstance = (providerKey?: string) => {
-    const key = providerKey || enabledProviderKeys[0] || 'easypay';
+  const openCreateInstance = () => {
+    const key = enabledProviderKeys[0] || 'easypay';
     setEditingInstance(null);
     setInstanceForm({
       providerKey: key,
@@ -500,14 +463,7 @@ function PaymentConfigContent() {
     setInstanceModalOpen(true);
   };
 
-  const toggleCollapse = (providerKey: string) => {
-    setCollapsedProviders((prev) => {
-      const next = new Set(prev);
-      if (next.has(providerKey)) next.delete(providerKey);
-      else next.add(providerKey);
-      return next;
-    });
-  };
+  // ── Save config ──
 
   const saveConfig = async () => {
     setRcSaving(true);
@@ -515,10 +471,7 @@ function PaymentConfigContent() {
     try {
       const res = await fetch('/api/admin/config', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           configs: [
             { key: 'PRODUCT_NAME_PREFIX', value: rcPrefix.trim(), group: 'payment', label: '商品名前缀' },
@@ -558,6 +511,7 @@ function PaymentConfigContent() {
             { key: 'LOAD_BALANCE_STRATEGY', value: rcLoadBalanceStrategy, group: 'payment', label: '负载均衡策略' },
             ...(rcOverrideEnv
               ? [
+                  { key: 'ENABLED_PROVIDERS', value: rcEnabledProviders, group: 'payment', label: '启用的服务商' },
                   {
                     key: 'ENABLED_PAYMENT_TYPES',
                     value: rcEnabledPaymentTypes,
@@ -573,21 +527,13 @@ function PaymentConfigContent() {
           ],
         }),
       });
-      if (!res.ok) {
-        setError(t.configSaveFailed);
-      }
+      if (!res.ok) setError(t.configSaveFailed);
     } catch {
       setError(t.configSaveFailed);
     } finally {
       setRcSaving(false);
     }
   };
-
-  useEffect(() => {
-    fetchConfig();
-    fetchInstances();
-    fetchEnvDefaults();
-  }, [fetchConfig, fetchInstances, fetchEnvDefaults]);
 
   // ── Missing token ──
   if (!token) {
@@ -608,38 +554,16 @@ function PaymentConfigContent() {
       ? 'border-slate-600 bg-slate-700 text-slate-100 placeholder-slate-400'
       : 'border-slate-300 bg-white text-slate-900 placeholder-slate-400',
   ].join(' ');
-
   const labelCls = ['block text-sm font-medium mb-1', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ');
-
   const cardCls = [
     'rounded-xl border p-5',
     isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white shadow-sm',
   ].join(' ');
-
   const subCardCls = [
     'rounded-lg border p-4',
     isDark ? 'border-slate-600 bg-slate-700/40' : 'border-slate-200 bg-slate-50',
   ].join(' ');
 
-  // Group instances by providerKey
-  const instancesByProvider: Record<string, ProviderInstanceData[]> = {};
-  for (const inst of instances) {
-    if (!instancesByProvider[inst.providerKey]) {
-      instancesByProvider[inst.providerKey] = [];
-    }
-    instancesByProvider[inst.providerKey].push(inst);
-  }
-
-  const toggleSupportedType = (type: string) => {
-    setInstanceForm((prev) => ({
-      ...prev,
-      supportedTypes: prev.supportedTypes.includes(type)
-        ? prev.supportedTypes.filter((t) => t !== type)
-        : [...prev.supportedTypes, type],
-    }));
-  };
-
-  // Toggle switch component
   const Toggle = ({ value, onChange, disabled }: { value: boolean; onChange: () => void; disabled?: boolean }) => (
     <button
       type="button"
@@ -682,10 +606,8 @@ function PaymentConfigContent() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════
-          Section 1: 基础配置
-          ═══════════════════════════════════════════════ */}
-      <div className={`${cardCls} mb-4`}>
+      {/* ══ 基础配置 ══ */}
+      <div className={cardCls}>
         <h2 className={`text-base font-semibold mb-1 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
           {t.basicConfig}
         </h2>
@@ -723,7 +645,7 @@ function PaymentConfigContent() {
           </div>
         </div>
 
-        {/* Toggles + numbers */}
+        {/* Toggles row */}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
           <div className="flex items-center gap-2">
             <Toggle value={rcBalanceEnabled} onChange={() => setRcBalanceEnabled(!rcBalanceEnabled)} />
@@ -812,7 +734,7 @@ function PaymentConfigContent() {
           )}
         </div>
 
-        {/* ── 覆盖环境变量配置 (子卡片) ── */}
+        {/* ── 覆盖环境变量配置 ── */}
         <div className={subCardCls}>
           <div className="flex items-center gap-3 mb-2">
             <Toggle value={rcOverrideEnv} onChange={handleOverrideEnvToggle} disabled={rcOverrideSaved} />
@@ -827,20 +749,20 @@ function PaymentConfigContent() {
               <div className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.loadingEnvDefaults}</div>
             ) : (
               <>
-                {/* Payment type badges */}
+                {/* Provider type badges */}
                 <div className="mb-3">
-                  <label className={labelCls}>{t.enabledPaymentTypes}</label>
+                  <label className={labelCls}>{t.enabledProviders}</label>
                   <div className="flex flex-wrap gap-2">
-                    {ALL_PAYMENT_TYPES.map((type) => {
-                      const isActive = rcEnabledPaymentTypes
+                    {ALL_PROVIDER_KEYS.map((key) => {
+                      const isActive = rcEnabledProviders
                         .split(',')
                         .map((s) => s.trim())
-                        .includes(type);
+                        .includes(key);
                       return (
                         <button
-                          key={type}
+                          key={key}
                           type="button"
-                          onClick={() => togglePaymentType(type)}
+                          onClick={() => toggleProvider(key)}
                           className={[
                             'rounded-lg border px-4 py-2 text-sm font-medium transition-all',
                             isActive
@@ -850,13 +772,15 @@ function PaymentConfigContent() {
                                 : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:bg-slate-50',
                           ].join(' ')}
                         >
-                          {PAYMENT_TYPE_LABELS[type]?.[locale] || type}
+                          {PROVIDER_LABELS[key]?.[locale] || key}
                         </button>
                       );
                     })}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+                {/* Amount / timeout fields */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   <div>
                     <label className={labelCls}>{t.minRechargeAmount}</label>
                     <input
@@ -899,173 +823,111 @@ function PaymentConfigContent() {
                   </div>
                 </div>
 
-                {/* ── 服务商管理 (在覆盖环境变量配置内) ── */}
-                {enabledProviderKeys.length > 0 && (
-                  <div
-                    className="mt-4 pt-4 border-t border-dashed"
-                    style={{ borderColor: isDark ? '#475569' : '#e2e8f0' }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                          {t.providerManagement}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <label
-                            className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
-                          >
-                            {t.loadBalanceStrategy}
-                          </label>
-                          <select
-                            value={rcLoadBalanceStrategy}
-                            onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
-                            className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
-                          >
-                            <option value="round-robin">{t.strategyRoundRobin}</option>
-                            <option value="least-amount">{t.strategyLeastAmount}</option>
-                          </select>
-                        </div>
+                {/* ── 服务商管理 ── */}
+                <div className="pt-4 border-t border-dashed" style={{ borderColor: isDark ? '#475569' : '#e2e8f0' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                        {t.providerManagement}
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <label className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {t.loadBalanceStrategy}
+                        </label>
+                        <select
+                          value={rcLoadBalanceStrategy}
+                          onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
+                          className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
+                        >
+                          <option value="round-robin">{t.strategyRoundRobin}</option>
+                          <option value="least-amount">{t.strategyLeastAmount}</option>
+                        </select>
                       </div>
+                    </div>
+                    {enabledProviderKeys.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => openCreateInstance()}
+                        onClick={openCreateInstance}
                         className="inline-flex items-center rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
                       >
                         + {t.addInstance}
                       </button>
-                    </div>
+                    )}
+                  </div>
 
-                    {/* Provider type groups — only enabled ones */}
-                    {enabledProviderKeys.map((providerKey) => {
-                      const providerInstances = instancesByProvider[providerKey] || [];
-                      const providerLabel = PROVIDER_LABELS[providerKey]?.[locale] || providerKey;
-                      const possibleTypes = PROVIDER_SUPPORTED_TYPES[providerKey] || [];
-                      const isCollapsed = collapsedProviders.has(providerKey);
-
-                      return (
-                        <div key={providerKey} className={`${subCardCls} mb-3 last:mb-0`}>
-                          {/* Provider type header */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleCollapse(providerKey)}
-                                className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}
+                  {/* Flat instance list */}
+                  {instances.length === 0 ? (
+                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t.noInstances}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {instances.map((inst) => {
+                        const instTypes = inst.supportedTypes ? inst.supportedTypes.split(',').filter(Boolean) : [];
+                        return (
+                          <div
+                            key={inst.id}
+                            className={[
+                              'flex items-center justify-between rounded-lg border px-3 py-2.5',
+                              isDark ? 'border-slate-500/50 bg-slate-800/60' : 'border-slate-200 bg-white',
+                            ].join(' ')}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <span
+                                className={`text-xs ${inst.enabled ? 'text-emerald-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}
                               >
-                                {isCollapsed ? '▶' : '▼'}
-                              </button>
-                              <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                                {providerLabel}
-                              </h3>
+                                {inst.enabled ? '●' : '○'}
+                              </span>
+                              <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                                {inst.name}
+                              </span>
                               <span
                                 className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}
                               >
-                                {providerInstances.length} {locale === 'en' ? 'instance(s)' : '个实例'}
+                                {PROVIDER_LABELS[inst.providerKey]?.[locale] || inst.providerKey}
                               </span>
-                              <div className="flex items-center gap-1 ml-1">
-                                {possibleTypes.map((type) => (
+                              {instTypes.length > 0 ? (
+                                instTypes.map((type) => (
                                   <span
                                     key={type}
-                                    className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-600'}`}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}
                                   >
                                     {PAYMENT_TYPE_LABELS[type]?.[locale] || type}
                                   </span>
-                                ))}
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => openCreateInstance(providerKey)}
-                              className={`text-xs font-medium px-2 py-1 rounded-md transition-colors ${isDark ? 'text-emerald-400 hover:bg-emerald-500/15' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                            >
-                              + {t.addInstance}
-                            </button>
-                          </div>
-
-                          {/* Collapsible content */}
-                          {!isCollapsed && (
-                            <div className="mt-3">
-                              {providerInstances.length === 0 ? (
-                                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                                  {t.noInstances}
-                                </p>
+                                ))
                               ) : (
-                                <div className="space-y-2">
-                                  {providerInstances.map((inst) => {
-                                    const instTypes = inst.supportedTypes
-                                      ? inst.supportedTypes.split(',').filter(Boolean)
-                                      : [];
-                                    return (
-                                      <div
-                                        key={inst.id}
-                                        className={[
-                                          'flex items-center justify-between rounded-lg border px-3 py-2.5',
-                                          isDark ? 'border-slate-500/50 bg-slate-800/60' : 'border-slate-200 bg-white',
-                                        ].join(' ')}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                          <span
-                                            className={`text-xs ${inst.enabled ? 'text-emerald-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}
-                                          >
-                                            {inst.enabled ? '●' : '○'}
-                                          </span>
-                                          <span
-                                            className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}
-                                          >
-                                            {inst.name}
-                                          </span>
-                                          {instTypes.length > 0 ? (
-                                            <div className="flex items-center gap-1">
-                                              {instTypes.map((type) => (
-                                                <span
-                                                  key={type}
-                                                  className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}
-                                                >
-                                                  {PAYMENT_TYPE_LABELS[type]?.[locale] || type}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <span
-                                              className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-600 text-slate-400' : 'bg-slate-100 text-slate-500'}`}
-                                            >
-                                              {t.allChannels}
-                                            </span>
-                                          )}
-                                          {inst.todayAmount !== undefined && inst.todayAmount > 0 && (
-                                            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                              {t.todayAmount}: ¥{inst.todayAmount}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                          <button
-                                            type="button"
-                                            onClick={() => openEditInstance(inst)}
-                                            className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${isDark ? 'text-indigo-400 hover:bg-indigo-500/15' : 'text-indigo-600 hover:bg-indigo-50'}`}
-                                          >
-                                            {locale === 'en' ? 'Edit' : '编辑'}
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteInstance(inst.id)}
-                                            className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${isDark ? 'text-red-400 hover:bg-red-500/15' : 'text-red-600 hover:bg-red-50'}`}
-                                          >
-                                            {locale === 'en' ? 'Delete' : '删除'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-600 text-slate-400' : 'bg-slate-100 text-slate-500'}`}
+                                >
+                                  {t.allChannels}
+                                </span>
+                              )}
+                              {inst.todayAmount !== undefined && inst.todayAmount > 0 && (
+                                <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {t.todayAmount}: ¥{inst.todayAmount}
+                                </span>
                               )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => openEditInstance(inst)}
+                                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${isDark ? 'text-indigo-400 hover:bg-indigo-500/15' : 'text-indigo-600 hover:bg-indigo-50'}`}
+                              >
+                                {locale === 'en' ? 'Edit' : '编辑'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteInstance(inst.id)}
+                                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${isDark ? 'text-red-400 hover:bg-red-500/15' : 'text-red-600 hover:bg-red-50'}`}
+                              >
+                                {locale === 'en' ? 'Delete' : '删除'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </>
             ))}
         </div>
@@ -1083,9 +945,7 @@ function PaymentConfigContent() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════
-          Instance Edit / Create Modal
-          ═══════════════════════════════════════════════ */}
+      {/* ══ Instance Modal ══ */}
       {instanceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div
@@ -1108,7 +968,6 @@ function PaymentConfigContent() {
             )}
 
             <div className="space-y-4">
-              {/* Provider type + name */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{t.instanceProvider}</label>
@@ -1145,7 +1004,6 @@ function PaymentConfigContent() {
                 </div>
               </div>
 
-              {/* Enabled + sort order */}
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <Toggle
@@ -1168,7 +1026,6 @@ function PaymentConfigContent() {
                 </div>
               </div>
 
-              {/* Supported channels */}
               {(PROVIDER_SUPPORTED_TYPES[instanceForm.providerKey] || []).length > 1 && (
                 <div>
                   <label className={labelCls}>{t.supportedChannels}</label>
@@ -1182,7 +1039,14 @@ function PaymentConfigContent() {
                         <button
                           key={type}
                           type="button"
-                          onClick={() => toggleSupportedType(type)}
+                          onClick={() =>
+                            setInstanceForm((p) => ({
+                              ...p,
+                              supportedTypes: isActive
+                                ? p.supportedTypes.filter((t) => t !== type)
+                                : [...p.supportedTypes, type],
+                            }))
+                          }
                           className={[
                             'rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                             isActive
@@ -1201,7 +1065,6 @@ function PaymentConfigContent() {
                 </div>
               )}
 
-              {/* Config fields */}
               <div>
                 <label className={[labelCls, 'mb-2'].join(' ')}>{t.instanceConfig}</label>
                 <div className="space-y-2.5">
@@ -1233,7 +1096,6 @@ function PaymentConfigContent() {
               </div>
             </div>
 
-            {/* Modal actions */}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
@@ -1265,7 +1127,6 @@ function PaymentConfigContent() {
 function PaymentConfigPageFallback() {
   const searchParams = useSearchParams();
   const locale = resolveLocale(searchParams.get('lang'));
-
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-slate-500">{locale === 'en' ? 'Loading...' : '加载中...'}</div>
