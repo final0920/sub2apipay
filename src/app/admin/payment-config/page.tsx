@@ -83,6 +83,16 @@ function getTexts(locale: Locale) {
       };
 }
 
+// ── Payment type display names ──
+
+const PAYMENT_TYPE_LABELS: Record<string, { zh: string; en: string }> = {
+  alipay: { zh: '支付宝（易支付）', en: 'Alipay (EasyPay)' },
+  wxpay: { zh: '微信支付（易支付）', en: 'WeChat Pay (EasyPay)' },
+  alipay_direct: { zh: '支付宝（直连）', en: 'Alipay (Direct)' },
+  wxpay_direct: { zh: '微信支付（直连）', en: 'WeChat Pay (Direct)' },
+  stripe: { zh: 'Stripe（国际卡）', en: 'Stripe (International)' },
+};
+
 // ── Main Content ──
 
 function PaymentConfigContent() {
@@ -116,6 +126,7 @@ function PaymentConfigContent() {
   const [rcDailyLimit, setRcDailyLimit] = useState('');
   const [rcOrderTimeout, setRcOrderTimeout] = useState('');
   const [loadingEnvDefaults, setLoadingEnvDefaults] = useState(false);
+  const [availablePaymentTypes, setAvailablePaymentTypes] = useState<string[]>([]);
 
   // Fetch recharge config
   const fetchRechargeConfig = useCallback(async () => {
@@ -165,6 +176,7 @@ function PaymentConfigContent() {
       if (res.ok) {
         const data = await res.json();
         const d = data.defaults;
+        if (data.availablePaymentTypes) setAvailablePaymentTypes(data.availablePaymentTypes);
         setRcEnabledPaymentTypes(d.ENABLED_PAYMENT_TYPES || '');
         setRcMinAmount(d.RECHARGE_MIN_AMOUNT || '1');
         setRcMaxAmount(d.RECHARGE_MAX_AMOUNT || '1000');
@@ -358,58 +370,93 @@ function PaymentConfigContent() {
               {t.loadingEnvDefaults}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+            <>
+              <div className="mb-4">
                 <label className={labelCls}>{t.enabledPaymentTypes}</label>
-                <input
-                  type="text"
-                  value={rcEnabledPaymentTypes}
-                  onChange={(e) => setRcEnabledPaymentTypes(e.target.value)}
-                  className={inputCls}
-                  placeholder="alipay,wxpay,stripe"
-                />
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {availablePaymentTypes.map((type) => {
+                    const enabled = rcEnabledPaymentTypes
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    const isSelected = enabled.includes(type);
+                    const label = PAYMENT_TYPE_LABELS[type]?.[locale] || type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          const current = rcEnabledPaymentTypes
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                          const next = isSelected ? current.filter((t) => t !== type) : [...current, type];
+                          setRcEnabledPaymentTypes(next.join(','));
+                        }}
+                        className={[
+                          'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
+                            : isDark
+                              ? 'border-slate-600 text-slate-400 hover:border-slate-500'
+                              : 'border-slate-300 text-slate-500 hover:border-slate-400',
+                        ].join(' ')}
+                      >
+                        {isSelected ? '✓ ' : ''}
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {availablePaymentTypes.length === 0 && (
+                    <span className={['text-xs', isDark ? 'text-slate-500' : 'text-slate-400'].join(' ')}>
+                      {locale === 'en' ? 'No payment providers configured' : '未配置支付服务商'}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>{t.minRechargeAmount}</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={rcMinAmount}
-                  onChange={(e) => setRcMinAmount(e.target.value)}
-                  className={inputCls}
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>{t.minRechargeAmount}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rcMinAmount}
+                    onChange={(e) => setRcMinAmount(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.maxRechargeAmount}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rcMaxAmount}
+                    onChange={(e) => setRcMaxAmount(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.dailyRechargeLimit}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={rcDailyLimit}
+                    onChange={(e) => setRcDailyLimit(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.orderTimeoutMinutes}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={rcOrderTimeout}
+                    onChange={(e) => setRcOrderTimeout(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
               </div>
-              <div>
-                <label className={labelCls}>{t.maxRechargeAmount}</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={rcMaxAmount}
-                  onChange={(e) => setRcMaxAmount(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>{t.dailyRechargeLimit}</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={rcDailyLimit}
-                  onChange={(e) => setRcDailyLimit(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>{t.orderTimeoutMinutes}</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={rcOrderTimeout}
-                  onChange={(e) => setRcOrderTimeout(e.target.value)}
-                  className={inputCls}
-                />
-              </div>
-            </div>
+            </>
           ))}
       </div>
 

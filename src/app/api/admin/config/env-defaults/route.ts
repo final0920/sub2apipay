@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const supportedTypes = paymentRegistry.getSupportedTypes();
 
     return NextResponse.json({
+      availablePaymentTypes: supportedTypes,
       defaults: {
         ENABLED_PAYMENT_TYPES: supportedTypes.join(','),
         RECHARGE_MIN_AMOUNT: String(env.MIN_RECHARGE_AMOUNT),
