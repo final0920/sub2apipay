@@ -146,7 +146,11 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   const payAmountStr = calculatePayAmount(input.amount, feeRate);
   const payAmountNum = Number(payAmountStr);
 
-  const expiresAt = new Date(Date.now() + env.ORDER_TIMEOUT_MINUTES * 60 * 1000);
+  const orderTimeoutConfig = await getSystemConfig('ORDER_TIMEOUT_MINUTES');
+  const orderTimeoutMinutes = orderTimeoutConfig
+    ? parseInt(orderTimeoutConfig, 10) || env.ORDER_TIMEOUT_MINUTES
+    : env.ORDER_TIMEOUT_MINUTES;
+  const expiresAt = new Date(Date.now() + orderTimeoutMinutes * 60 * 1000);
 
   // 读取最大支付中订单数配置
   const maxPendingConfig = await getSystemConfig('MAX_PENDING_ORDERS');

@@ -48,21 +48,36 @@ export async function GET(request: NextRequest) {
       getSystemConfig('ENABLED_PAYMENT_TYPES'),
       getSystemConfig('BALANCE_PAYMENT_DISABLED'),
       getSystemConfig('MAX_PENDING_ORDERS'),
-    ]).then(async ([configuredPaymentTypesRaw, balanceDisabledVal, maxPendingVal]) => {
-      const enabledTypes = resolveEnabledPaymentTypes(supportedTypes, configuredPaymentTypesRaw);
-      const methodLimits = await queryMethodLimits(enabledTypes);
-      return {
-        enabledTypes,
-        methodLimits,
-        balanceDisabled: balanceDisabledVal === 'true',
-        maxPendingOrders: maxPendingVal ? parseInt(maxPendingVal, 10) || 3 : 3,
-      };
-    });
+      getSystemConfig('RECHARGE_MIN_AMOUNT'),
+      getSystemConfig('RECHARGE_MAX_AMOUNT'),
+      getSystemConfig('DAILY_RECHARGE_LIMIT'),
+    ]).then(
+      async ([
+        configuredPaymentTypesRaw,
+        balanceDisabledVal,
+        maxPendingVal,
+        minAmountVal,
+        maxAmountVal,
+        dailyLimitVal,
+      ]) => {
+        const enabledTypes = resolveEnabledPaymentTypes(supportedTypes, configuredPaymentTypesRaw);
+        const methodLimits = await queryMethodLimits(enabledTypes);
+        return {
+          enabledTypes,
+          methodLimits,
+          balanceDisabled: balanceDisabledVal === 'true',
+          maxPendingOrders: maxPendingVal ? parseInt(maxPendingVal, 10) || 3 : 3,
+          minAmount: minAmountVal ? parseFloat(minAmountVal) || env.MIN_RECHARGE_AMOUNT : env.MIN_RECHARGE_AMOUNT,
+          maxAmount: maxAmountVal ? parseFloat(maxAmountVal) || env.MAX_RECHARGE_AMOUNT : env.MAX_RECHARGE_AMOUNT,
+          maxDailyAmount: dailyLimitVal ? parseFloat(dailyLimitVal) : env.MAX_DAILY_RECHARGE_AMOUNT,
+        };
+      },
+    );
 
-    const [user, { enabledTypes, methodLimits, balanceDisabled, maxPendingOrders }] = await Promise.all([
-      getUser(userId),
-      configPromise,
-    ]);
+    const [
+      user,
+      { enabledTypes, methodLimits, balanceDisabled, maxPendingOrders, minAmount, maxAmount, maxDailyAmount },
+    ] = await Promise.all([getUser(userId), configPromise]);
 
     // 收集 sublabel 覆盖
     const sublabelOverrides: Record<string, string> = {};
@@ -98,9 +113,9 @@ export async function GET(request: NextRequest) {
       },
       config: {
         enabledPaymentTypes: enabledTypes,
-        minAmount: env.MIN_RECHARGE_AMOUNT,
-        maxAmount: env.MAX_RECHARGE_AMOUNT,
-        maxDailyAmount: env.MAX_DAILY_RECHARGE_AMOUNT,
+        minAmount,
+        maxAmount,
+        maxDailyAmount,
         methodLimits,
         helpImageUrl: env.PAY_HELP_IMAGE_URL ?? null,
         helpText: env.PAY_HELP_TEXT ?? null,

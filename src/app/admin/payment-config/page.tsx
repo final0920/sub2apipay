@@ -36,6 +36,14 @@ function getTexts(locale: Locale) {
         cancelRateLimitWindowModeFixed: 'Fixed',
         cancelRateLimitHint: (w: string, u: string, m: string, mode: string) =>
           `Within ${w} ${u === 'minute' ? 'minute(s)' : u === 'day' ? 'day(s)' : 'hour(s)'}, max ${m} cancellation(s) (${mode === 'fixed' ? 'fixed window' : 'rolling window'})`,
+        overrideEnvConfig: 'Override Env Config',
+        overrideEnvHint: 'When enabled, database settings override environment variables',
+        enabledPaymentTypes: 'Enabled Payment Types',
+        minRechargeAmount: 'Min Recharge Amount',
+        maxRechargeAmount: 'Max Recharge Amount',
+        dailyRechargeLimit: 'Daily Recharge Limit (0=unlimited)',
+        orderTimeoutMinutes: 'Order Timeout (minutes)',
+        loadingEnvDefaults: 'Loading defaults...',
       }
     : {
         missingToken: '缺少管理员凭证',
@@ -64,6 +72,14 @@ function getTexts(locale: Locale) {
         cancelRateLimitWindowModeFixed: '固定',
         cancelRateLimitHint: (w: string, u: string, m: string, mode: string) =>
           `${w} ${u === 'minute' ? '分钟' : u === 'day' ? '天' : '小时'}内最多可取消 ${m} 次（${mode === 'fixed' ? '固定窗口' : '滚动窗口'}）`,
+        overrideEnvConfig: '覆盖环境变量配置',
+        overrideEnvHint: '开启后，数据库配置将覆盖环境变量',
+        enabledPaymentTypes: '启用的支付方式',
+        minRechargeAmount: '最小充值金额',
+        maxRechargeAmount: '最大充值金额',
+        dailyRechargeLimit: '每日充值限额（0=不限）',
+        orderTimeoutMinutes: '订单超时（分钟）',
+        loadingEnvDefaults: '加载默认值...',
       };
 }
 
@@ -92,6 +108,14 @@ function PaymentConfigContent() {
   const [rcCancelRateLimitWindowMode, setRcCancelRateLimitWindowMode] = useState('rolling');
   const [rcMaxPendingOrders, setRcMaxPendingOrders] = useState('3');
   const [rcSaving, setRcSaving] = useState(false);
+  const [rcOverrideEnv, setRcOverrideEnv] = useState(false);
+  const [rcOverrideSaved, setRcOverrideSaved] = useState(false);
+  const [rcEnabledPaymentTypes, setRcEnabledPaymentTypes] = useState('');
+  const [rcMinAmount, setRcMinAmount] = useState('');
+  const [rcMaxAmount, setRcMaxAmount] = useState('');
+  const [rcDailyLimit, setRcDailyLimit] = useState('');
+  const [rcOrderTimeout, setRcOrderTimeout] = useState('');
+  const [loadingEnvDefaults, setLoadingEnvDefaults] = useState(false);
 
   // Fetch recharge config
   const fetchRechargeConfig = useCallback(async () => {
@@ -101,6 +125,14 @@ function PaymentConfigContent() {
       if (res.ok) {
         const data = await res.json();
         const configs: { key: string; value: string }[] = data.configs ?? [];
+        const overrideKeys = [
+          'ENABLED_PAYMENT_TYPES',
+          'RECHARGE_MIN_AMOUNT',
+          'RECHARGE_MAX_AMOUNT',
+          'DAILY_RECHARGE_LIMIT',
+          'ORDER_TIMEOUT_MINUTES',
+        ];
+        let hasOverride = false;
         for (const c of configs) {
           if (c.key === 'PRODUCT_NAME_PREFIX') setRcPrefix(c.value);
           if (c.key === 'PRODUCT_NAME_SUFFIX') setRcSuffix(c.value);
@@ -111,12 +143,49 @@ function PaymentConfigContent() {
           if (c.key === 'CANCEL_RATE_LIMIT_MAX') setRcCancelRateLimitMax(c.value || '10');
           if (c.key === 'CANCEL_RATE_LIMIT_WINDOW_MODE') setRcCancelRateLimitWindowMode(c.value || 'rolling');
           if (c.key === 'MAX_PENDING_ORDERS') setRcMaxPendingOrders(c.value || '3');
+          if (c.key === 'ENABLED_PAYMENT_TYPES') setRcEnabledPaymentTypes(c.value);
+          if (c.key === 'RECHARGE_MIN_AMOUNT') setRcMinAmount(c.value);
+          if (c.key === 'RECHARGE_MAX_AMOUNT') setRcMaxAmount(c.value);
+          if (c.key === 'DAILY_RECHARGE_LIMIT') setRcDailyLimit(c.value);
+          if (c.key === 'ORDER_TIMEOUT_MINUTES') setRcOrderTimeout(c.value);
+          if (overrideKeys.includes(c.key)) hasOverride = true;
         }
+        setRcOverrideEnv(hasOverride);
+        setRcOverrideSaved(hasOverride);
       }
     } catch {
       /* ignore */
     }
   }, [token]);
+
+  const fetchEnvDefaults = async () => {
+    setLoadingEnvDefaults(true);
+    try {
+      const res = await fetch(`/api/admin/config/env-defaults?token=${encodeURIComponent(token)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const d = data.defaults;
+        setRcEnabledPaymentTypes(d.ENABLED_PAYMENT_TYPES || '');
+        setRcMinAmount(d.RECHARGE_MIN_AMOUNT || '1');
+        setRcMaxAmount(d.RECHARGE_MAX_AMOUNT || '1000');
+        setRcDailyLimit(d.DAILY_RECHARGE_LIMIT || '10000');
+        setRcOrderTimeout(d.ORDER_TIMEOUT_MINUTES || '5');
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingEnvDefaults(false);
+    }
+  };
+
+  const handleOverrideEnvToggle = () => {
+    if (rcOverrideSaved) return; // 已保存的覆盖不允许关闭
+    const newValue = !rcOverrideEnv;
+    setRcOverrideEnv(newValue);
+    if (newValue && !rcEnabledPaymentTypes && !rcMinAmount && !rcMaxAmount && !rcDailyLimit && !rcOrderTimeout) {
+      fetchEnvDefaults();
+    }
+  };
 
   const saveRechargeConfig = async () => {
     setRcSaving(true);
@@ -174,6 +243,20 @@ function PaymentConfigContent() {
               group: 'payment',
               label: '最多可存在支付中订单',
             },
+            ...(rcOverrideEnv
+              ? [
+                  {
+                    key: 'ENABLED_PAYMENT_TYPES',
+                    value: rcEnabledPaymentTypes,
+                    group: 'payment',
+                    label: '启用的支付方式',
+                  },
+                  { key: 'RECHARGE_MIN_AMOUNT', value: rcMinAmount, group: 'payment', label: '最小充值金额' },
+                  { key: 'RECHARGE_MAX_AMOUNT', value: rcMaxAmount, group: 'payment', label: '最大充值金额' },
+                  { key: 'DAILY_RECHARGE_LIMIT', value: rcDailyLimit, group: 'payment', label: '每日充值限额' },
+                  { key: 'ORDER_TIMEOUT_MINUTES', value: rcOrderTimeout, group: 'payment', label: '订单超时时间' },
+                ]
+              : []),
           ],
         }),
       });
@@ -237,6 +320,98 @@ function PaymentConfigContent() {
           </button>
         </div>
       )}
+
+      {/* ── Override Env Config ── */}
+      <div
+        className={[
+          'rounded-xl border p-4 mb-4',
+          isDark ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white shadow-sm',
+        ].join(' ')}
+      >
+        <div className="flex items-center gap-3 mb-2">
+          <button
+            type="button"
+            onClick={handleOverrideEnvToggle}
+            disabled={rcOverrideSaved}
+            className={[
+              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+              rcOverrideEnv ? 'bg-emerald-500' : isDark ? 'bg-slate-600' : 'bg-slate-300',
+              rcOverrideSaved ? 'cursor-not-allowed opacity-60' : '',
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
+                rcOverrideEnv ? 'translate-x-4.5' : 'translate-x-0.5',
+              ].join(' ')}
+            />
+          </button>
+          <span className={['text-sm', isDark ? 'text-slate-300' : 'text-slate-700'].join(' ')}>
+            {t.overrideEnvConfig}
+          </span>
+        </div>
+        <p className={['text-xs mb-3', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>{t.overrideEnvHint}</p>
+
+        {rcOverrideEnv &&
+          (loadingEnvDefaults ? (
+            <div className={['text-sm', isDark ? 'text-slate-400' : 'text-slate-500'].join(' ')}>
+              {t.loadingEnvDefaults}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>{t.enabledPaymentTypes}</label>
+                <input
+                  type="text"
+                  value={rcEnabledPaymentTypes}
+                  onChange={(e) => setRcEnabledPaymentTypes(e.target.value)}
+                  className={inputCls}
+                  placeholder="alipay,wxpay,stripe"
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.minRechargeAmount}</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rcMinAmount}
+                  onChange={(e) => setRcMinAmount(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.maxRechargeAmount}</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rcMaxAmount}
+                  onChange={(e) => setRcMaxAmount(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.dailyRechargeLimit}</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={rcDailyLimit}
+                  onChange={(e) => setRcDailyLimit(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>{t.orderTimeoutMinutes}</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={rcOrderTimeout}
+                  onChange={(e) => setRcOrderTimeout(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          ))}
+      </div>
 
       {/* ── Payment Config ── */}
       <div
