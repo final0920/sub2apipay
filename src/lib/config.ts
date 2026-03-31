@@ -123,6 +123,11 @@ function resolveKeyValue(value: string | undefined): string | undefined {
 export function getEnv(): Env {
   if (cachedEnv) return cachedEnv;
 
+  // 构建阶段不校验环境变量（next build 收集页面数据时会触发）
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return {} as Env;
+  }
+
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     console.error('Invalid environment variables:', parsed.error.flatten().fieldErrors);

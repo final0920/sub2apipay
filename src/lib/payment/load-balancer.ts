@@ -9,16 +9,27 @@ export type LoadBalanceStrategy = 'round-robin' | 'least-amount';
 
 /**
  * Select an instance for a given provider key based on the configured strategy.
+ * Optionally filter by paymentType (e.g. 'alipay', 'wxpay').
  * Returns the instance ID and decrypted config.
  */
 export async function selectInstance(
   providerKey: string,
   strategy: LoadBalanceStrategy = 'round-robin',
+  paymentType?: string,
 ): Promise<{ instanceId: string; config: Record<string, string> } | null> {
-  const instances = await prisma.paymentProviderInstance.findMany({
+  const allInstances = await prisma.paymentProviderInstance.findMany({
     where: { providerKey, enabled: true },
     orderBy: { sortOrder: 'asc' },
   });
+
+  // Filter by supportedTypes if paymentType is specified
+  const instances = paymentType
+    ? allInstances.filter((inst) => {
+        if (!inst.supportedTypes) return true; // empty = supports all
+        const types = inst.supportedTypes.split(',').map((s) => s.trim()).filter(Boolean);
+        return types.length === 0 || types.includes(paymentType);
+      })
+    : allInstances;
 
   if (instances.length === 0) return null;
 

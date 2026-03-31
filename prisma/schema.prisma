@@ -143,14 +143,15 @@ model SystemConfig {
 
 // ── 支付服务商实例（多实例轮询） ──
 model PaymentProviderInstance {
-  id          String   @id @default(cuid())
-  providerKey String   @map("provider_key") // easypay, alipay, wxpay, stripe
-  name        String   // display name like "易支付A"
-  config      String   @db.Text // encrypted JSON credentials
-  enabled     Boolean  @default(true)
-  sortOrder   Int      @default(0) @map("sort_order")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  providerKey    String   @map("provider_key") // easypay, alipay, wxpay, stripe
+  name           String   // display name like "易支付A"
+  config         String   @db.Text // encrypted JSON credentials
+  supportedTypes String   @default("") @map("supported_types") // comma-separated: alipay,wxpay,stripe
+  enabled        Boolean  @default(true)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([providerKey])
   @@index([providerKey, enabled])

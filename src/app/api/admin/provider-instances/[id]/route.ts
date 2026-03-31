@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { providerKey, name, config, enabled, sortOrder } = body;
+    const { providerKey, name, config, enabled, sortOrder, supportedTypes } = body;
 
     const existing = await prisma.paymentProviderInstance.findUnique({
       where: { id },
@@ -141,6 +141,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if (enabled !== undefined) data.enabled = enabled;
+    if (supportedTypes !== undefined) data.supportedTypes = supportedTypes;
     if (sortOrder !== undefined) {
       if (!Number.isInteger(sortOrder) || sortOrder < 0) {
         return NextResponse.json({ error: 'sortOrder 必须是非负整数' }, { status: 400 });
