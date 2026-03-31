@@ -370,6 +370,15 @@ function PaymentConfigContent() {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+    // Prevent disabling if instances exist
+    if (current.includes(key) && instances.some((inst) => inst.providerKey === key)) {
+      setError(
+        locale === 'en'
+          ? `Cannot disable "${PROVIDER_LABELS[key]?.en || key}": instances exist. Delete all instances first.`
+          : `无法关闭「${PROVIDER_LABELS[key]?.zh || key}」：存在关联实例，请先删除所有实例。`,
+      );
+      return;
+    }
     const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
     setRcEnabledProviders(next.join(','));
     // Auto-derive enabled payment types

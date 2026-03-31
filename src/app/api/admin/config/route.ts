@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
-import { getAllSystemConfigs, setSystemConfigs } from '@/lib/system-config';
+import { getAllSystemConfigs, setSystemConfigs, getSystemConfig } from '@/lib/system-config';
+import { prisma } from '@/lib/db';
 
 const SENSITIVE_PATTERNS = ['KEY', 'SECRET', 'PASSWORD', 'PRIVATE'];
 
@@ -67,6 +68,40 @@ export async function PUT(request: NextRequest) {
       }
       if (!ALLOWED_CONFIG_KEYS.has(config.key)) {
         return NextResponse.json({ error: `不允许修改配置项: ${config.key}` }, { status: 400 });
+      }
+    }
+
+    // 校验 ENABLED_PROVIDERS：不能移除有实例的服务商类型
+    const enabledProvidersConfig = configs.find((c: { key: string; value: string }) => c.key === 'ENABLED_PROVIDERS');
+    if (enabledProvidersConfig) {
+      const newProviders = new Set(
+        enabledProvidersConfig.value
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean),
+      );
+      const currentProviders = await getSystemConfig('ENABLED_PROVIDERS');
+      if (currentProviders) {
+        const oldProviders = currentProviders
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const removedProviders = oldProviders.filter((p) => !newProviders.has(p));
+        if (removedProviders.length > 0) {
+          const instanceCounts = await prisma.paymentProviderInstance.groupBy({
+            by: ['providerKey'],
+            where: { providerKey: { in: removedProviders } },
+            _count: true,
+          });
+          const blocked = instanceCounts.filter((g) => g._count > 0);
+          if (blocked.length > 0) {
+            const names = blocked.map((g) => g.providerKey).join(', ');
+            return NextResponse.json(
+              { error: `无法关闭服务商类型 [${names}]：存在关联实例，请先删除所有实例` },
+              { status: 409 },
+            );
+          }
+        }
       }
     }
 
