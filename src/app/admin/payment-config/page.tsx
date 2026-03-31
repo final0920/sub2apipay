@@ -478,6 +478,24 @@ function PaymentConfigContent() {
     setInstanceModalOpen(true);
   };
 
+  const toggleInstanceEnabled = async (inst: ProviderInstanceData) => {
+    try {
+      const res = await fetch(`/api/admin/provider-instances/${inst.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: !inst.enabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || (locale === 'en' ? 'Failed to update instance' : '更新实例失败'));
+        return;
+      }
+      setInstances((prev) => prev.map((i) => (i.id === inst.id ? { ...i, enabled: !inst.enabled } : i)));
+    } catch {
+      setError(locale === 'en' ? 'Failed to update instance' : '更新实例失败');
+    }
+  };
+
   // ── Save config ──
 
   const saveConfig = async () => {
@@ -857,67 +875,85 @@ function PaymentConfigContent() {
                     />
                   </div>
                 </div>
+              </>
+            ))}
+        </div>
 
-                {/* ── 服务商管理 ── */}
-                <div className="pt-4 border-t border-dashed" style={{ borderColor: isDark ? '#475569' : '#e2e8f0' }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                        {t.providerManagement}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <label className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {t.loadBalanceStrategy}
-                        </label>
-                        <select
-                          value={rcLoadBalanceStrategy}
-                          onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
-                          className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
-                        >
-                          <option value="round-robin">{t.strategyRoundRobin}</option>
-                          <option value="least-amount">{t.strategyLeastAmount}</option>
-                        </select>
-                      </div>
-                    </div>
-                    {enabledProviderKeys.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={openCreateInstance}
-                        className="inline-flex items-center rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
-                      >
-                        + {t.addInstance}
-                      </button>
-                    )}
-                  </div>
+        {/* Save button */}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={saveConfig}
+            disabled={rcSaving}
+            className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {rcSaving ? t.savingConfig : t.saveConfig}
+          </button>
+        </div>
+      </div>
 
-                  {/* Flat instance list */}
-                  {instances.length === 0 ? (
-                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t.noInstances}</p>
+      {/* ══ 服务商管理 ══ */}
+      {rcOverrideEnv && enabledProviderKeys.length > 0 && (
+        <div className={cardCls}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                {t.providerManagement}
+              </h2>
+              <div className="flex items-center gap-2">
+                <label className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {t.loadBalanceStrategy}
+                </label>
+                <select
+                  value={rcLoadBalanceStrategy}
+                  onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
+                  className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
+                >
+                  <option value="round-robin">{t.strategyRoundRobin}</option>
+                  <option value="least-amount">{t.strategyLeastAmount}</option>
+                </select>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openCreateInstance}
+              className="inline-flex items-center rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+            >
+              + {t.addInstance}
+            </button>
+          </div>
+
+          {/* Per provider type groups */}
+          <div className="space-y-4">
+            {enabledProviderKeys.map((pk) => {
+              const providerInstances = instances.filter((i) => i.providerKey === pk);
+              return (
+                <div key={pk} className={subCardCls}>
+                  <h3 className={`text-sm font-semibold mb-2 ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    {PROVIDER_LABELS[pk]?.[locale] || pk}
+                  </h3>
+                  {providerInstances.length === 0 ? (
+                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {locale === 'en' ? 'No instances' : '暂无实例'}
+                    </p>
                   ) : (
-                    <div className="space-y-2">
-                      {instances.map((inst) => {
+                    <div className="space-y-1.5">
+                      {providerInstances.map((inst) => {
                         const instTypes = inst.supportedTypes ? inst.supportedTypes.split(',').filter(Boolean) : [];
                         return (
                           <div
                             key={inst.id}
                             className={[
-                              'flex items-center justify-between rounded-lg border px-3 py-2.5',
+                              'flex items-center justify-between rounded-lg border px-3 py-2',
                               isDark ? 'border-slate-500/50 bg-slate-800/60' : 'border-slate-200 bg-white',
                             ].join(' ')}
                           >
-                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                              <Toggle value={inst.enabled} onChange={() => toggleInstanceEnabled(inst)} />
                               <span
-                                className={`text-xs ${inst.enabled ? 'text-emerald-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}
+                                className={`text-sm font-medium ${inst.enabled ? (isDark ? 'text-slate-100' : 'text-slate-900') : isDark ? 'text-slate-500' : 'text-slate-400'}`}
                               >
-                                {inst.enabled ? '●' : '○'}
-                              </span>
-                              <span className={`text-sm font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                                 {inst.name}
-                              </span>
-                              <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full ${isDark ? 'bg-slate-600 text-slate-300' : 'bg-slate-200 text-slate-600'}`}
-                              >
-                                {PROVIDER_LABELS[inst.providerKey]?.[locale] || inst.providerKey}
                               </span>
                               {instTypes.length > 0 ? (
                                 instTypes.map((type) => (
@@ -963,22 +999,11 @@ function PaymentConfigContent() {
                     </div>
                   )}
                 </div>
-              </>
-            ))}
+              );
+            })}
+          </div>
         </div>
-
-        {/* Save button */}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={saveConfig}
-            disabled={rcSaving}
-            className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-          >
-            {rcSaving ? t.savingConfig : t.saveConfig}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* ══ Instance Modal ══ */}
       {instanceModalOpen && (
@@ -1039,25 +1064,28 @@ function PaymentConfigContent() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Toggle
-                    value={instanceForm.enabled}
-                    onChange={() => setInstanceForm({ ...instanceForm, enabled: !instanceForm.enabled })}
-                  />
-                  <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.instanceEnabled}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    {t.instanceSortOrder}
-                  </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t.instanceSortOrder}</label>
                   <input
                     type="number"
                     min="0"
                     value={instanceForm.sortOrder}
                     onChange={(e) => setInstanceForm({ ...instanceForm, sortOrder: parseInt(e.target.value, 10) || 0 })}
-                    className={[inputCls, '!w-20'].join(' ')}
+                    className={inputCls}
+                    placeholder="0"
                   />
+                </div>
+                <div className="flex items-end pb-1">
+                  <div className="flex items-center gap-2">
+                    <Toggle
+                      value={instanceForm.enabled}
+                      onChange={() => setInstanceForm({ ...instanceForm, enabled: !instanceForm.enabled })}
+                    />
+                    <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {t.instanceEnabled}
+                    </span>
+                  </div>
                 </div>
               </div>
 
