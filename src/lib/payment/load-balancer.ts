@@ -26,7 +26,10 @@ export async function selectInstance(
   const instances = paymentType
     ? allInstances.filter((inst) => {
         if (!inst.supportedTypes) return true; // empty = supports all
-        const types = inst.supportedTypes.split(',').map((s) => s.trim()).filter(Boolean);
+        const types = inst.supportedTypes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
         return types.length === 0 || types.includes(paymentType);
       })
     : allInstances;
