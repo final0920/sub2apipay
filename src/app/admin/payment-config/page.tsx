@@ -832,66 +832,40 @@ function PaymentConfigContent() {
                     <input type="number" min="1" value={rcOrderTimeout} onChange={(e) => setRcOrderTimeout(e.target.value)} className={inputCls} />
                   </div>
                 </div>
-              </>
-            ))}
-        </div>
 
-        {/* Save button */}
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={saveConfig}
-            disabled={rcSaving}
-            className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-          >
-            {rcSaving ? t.savingConfig : t.saveConfig}
-          </button>
-        </div>
-      </div>
+                {/* ── 服务商管理 (在覆盖环境变量配置内) ── */}
+                {enabledProviderKeys.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-dashed" style={{ borderColor: isDark ? '#475569' : '#e2e8f0' }}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <h3 className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {t.providerManagement}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <label className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {t.loadBalanceStrategy}
+                          </label>
+                          <select
+                            value={rcLoadBalanceStrategy}
+                            onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
+                            className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
+                          >
+                            <option value="round-robin">{t.strategyRoundRobin}</option>
+                            <option value="least-amount">{t.strategyLeastAmount}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openCreateInstance()}
+                        className="inline-flex items-center rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
+                      >
+                        + {t.addInstance}
+                      </button>
+                    </div>
 
-      {/* ═══════════════════════════════════════════════
-          Section 2: 服务商管理
-          ═══════════════════════════════════════════════ */}
-      <div className={cardCls}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className={`text-base font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-              {t.providerManagement}
-            </h2>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              {t.providerManagementHint}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className={`text-xs whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t.loadBalanceStrategy}
-              </label>
-              <select
-                value={rcLoadBalanceStrategy}
-                onChange={(e) => setRcLoadBalanceStrategy(e.target.value)}
-                className={[inputCls, '!w-auto !py-1.5 !text-xs'].join(' ')}
-              >
-                <option value="round-robin">{t.strategyRoundRobin}</option>
-                <option value="least-amount">{t.strategyLeastAmount}</option>
-              </select>
-            </div>
-            {enabledProviderKeys.length > 0 && (
-              <button
-                type="button"
-                onClick={() => openCreateInstance()}
-                className="inline-flex items-center rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-600"
-              >
-                + {t.addInstance}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Provider type groups — only enabled ones */}
-        {enabledProviderKeys.length === 0 ? (
-          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.noProviderEnabled}</p>
-        ) : (
+                    {/* Provider type groups — only enabled ones */}
+                    {
           enabledProviderKeys.map((providerKey) => {
             const providerInstances = instancesByProvider[providerKey] || [];
             const providerLabel = PROVIDER_LABELS[providerKey]?.[locale] || providerKey;
@@ -1009,8 +983,24 @@ function PaymentConfigContent() {
                 )}
               </div>
             );
-          })
-        )}
+          })}
+                  </div>
+                )}
+              </>
+            ))}
+        </div>
+
+        {/* Save button */}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={saveConfig}
+            disabled={rcSaving}
+            className="inline-flex items-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+          >
+            {rcSaving ? t.savingConfig : t.saveConfig}
+          </button>
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════
