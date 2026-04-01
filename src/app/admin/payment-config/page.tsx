@@ -690,6 +690,12 @@ function PaymentConfigContent() {
         </h2>
         <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.basicConfigHint}</p>
 
+        {/* Balance recharge toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <Toggle value={rcBalanceEnabled} onChange={() => setRcBalanceEnabled(!rcBalanceEnabled)} />
+          <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.enableBalanceRecharge}</span>
+        </div>
+
         {/* Product name */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           <div>
@@ -719,14 +725,6 @@ function PaymentConfigContent() {
             >
               {`${rcPrefix.trim() || 'Sub2API'} 100 ${rcSuffix.trim() || 'CNY'}`.trim()}
             </div>
-          </div>
-        </div>
-
-        {/* Toggles row */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mb-4">
-          <div className="flex items-center gap-2">
-            <Toggle value={rcBalanceEnabled} onChange={() => setRcBalanceEnabled(!rcBalanceEnabled)} />
-            <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.enableBalanceRecharge}</span>
           </div>
         </div>
 
