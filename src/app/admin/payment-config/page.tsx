@@ -23,7 +23,7 @@ function getTexts(locale: Locale) {
         saveConfig: 'Save Settings',
         savingConfig: 'Saving...',
         configSaveFailed: 'Failed to save configuration',
-        cancelRateLimit: 'Cancel Rate Limit',
+        cancelRateLimit: 'Limit Cancel Rate',
         cancelRateLimitWindow: 'Window',
         cancelRateLimitUnit: 'Unit',
         cancelRateLimitMax: 'Max',
@@ -83,7 +83,7 @@ function getTexts(locale: Locale) {
         saveConfig: '保存设置',
         savingConfig: '保存中...',
         configSaveFailed: '保存配置失败',
-        cancelRateLimit: '取消频率限制',
+        cancelRateLimit: '限制取消频率',
         cancelRateLimitWindow: '窗口',
         cancelRateLimitUnit: '周期',
         cancelRateLimitMax: '次数',
@@ -732,17 +732,17 @@ function PaymentConfigContent() {
 
         {/* Cancel rate limit */}
         <div className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Toggle
-              value={rcCancelRateLimitEnabled}
-              onChange={() => setRcCancelRateLimitEnabled(!rcCancelRateLimitEnabled)}
-            />
-            <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.cancelRateLimit}</span>
-          </div>
-          {rcCancelRateLimitEnabled && (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex items-center gap-2 self-center">
+              <Toggle
+                value={rcCancelRateLimitEnabled}
+                onChange={() => setRcCancelRateLimitEnabled(!rcCancelRateLimitEnabled)}
+              />
+              <span className={`text-sm whitespace-nowrap ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.cancelRateLimit}</span>
+            </div>
+            {rcCancelRateLimitEnabled && (
+              <>
+                <div className="w-20">
                   <label className={labelCls}>{t.cancelRateLimitWindow}</label>
                   <input
                     type="number"
@@ -753,7 +753,7 @@ function PaymentConfigContent() {
                     className={inputCls}
                   />
                 </div>
-                <div>
+                <div className="w-24">
                   <label className={labelCls}>{t.cancelRateLimitUnit}</label>
                   <select
                     value={rcCancelRateLimitUnit}
@@ -765,7 +765,7 @@ function PaymentConfigContent() {
                     <option value="day">{t.cancelRateLimitUnitDay}</option>
                   </select>
                 </div>
-                <div>
+                <div className="w-20">
                   <label className={labelCls}>{t.cancelRateLimitMax}</label>
                   <input
                     type="number"
@@ -776,7 +776,7 @@ function PaymentConfigContent() {
                     className={inputCls}
                   />
                 </div>
-                <div>
+                <div className="w-24">
                   <label className={labelCls}>{t.cancelRateLimitWindowMode}</label>
                   <select
                     value={rcCancelRateLimitWindowMode}
@@ -787,16 +787,18 @@ function PaymentConfigContent() {
                     <option value="fixed">{t.cancelRateLimitWindowModeFixed}</option>
                   </select>
                 </div>
-              </div>
-              <p className={`mt-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {t.cancelRateLimitHint(
-                  rcCancelRateLimitWindow,
-                  rcCancelRateLimitUnit,
-                  rcCancelRateLimitMax,
-                  rcCancelRateLimitWindowMode,
-                )}
-              </p>
-            </>
+              </>
+            )}
+          </div>
+          {rcCancelRateLimitEnabled && (
+            <p className={`mt-1.5 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {t.cancelRateLimitHint(
+                rcCancelRateLimitWindow,
+                rcCancelRateLimitUnit,
+                rcCancelRateLimitMax,
+                rcCancelRateLimitWindowMode,
+              )}
+            </p>
           )}
         </div>
 
