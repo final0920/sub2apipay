@@ -62,16 +62,30 @@ interface InstanceChannelLimits {
 }
 
 /**
- * 聚合实例级限额：对每个支付类型，取所有实例中最宽松的单笔范围 + 检查日限额是否全部用满。
+ * 聚合实例级限额：对每个支付类型，取所有实例中最宽松的单笔范围 + 检查日限额可用性。
+ * 当剩余日额度 < 该实例的 singleMin 时，视为该实例不可用。
  */
-async function aggregateInstanceLimits(
-  paymentTypes: string[],
-): Promise<
-  Record<string, { singleMin: number; singleMax: number; allInstancesDailyBlocked: boolean; hasInstances: boolean }>
+async function aggregateInstanceLimits(paymentTypes: string[]): Promise<
+  Record<
+    string,
+    {
+      singleMin: number;
+      singleMax: number;
+      allInstancesDailyBlocked: boolean;
+      maxRemainingCapacity: number | null;
+      hasInstances: boolean;
+    }
+  >
 > {
   const result: Record<
     string,
-    { singleMin: number; singleMax: number; allInstancesDailyBlocked: boolean; hasInstances: boolean }
+    {
+      singleMin: number;
+      singleMax: number;
+      allInstancesDailyBlocked: boolean;
+      maxRemainingCapacity: number | null;
+      hasInstances: boolean;
+    }
   > = {};
 
   const allInstances = await prisma.paymentProviderInstance.findMany({
@@ -80,16 +94,20 @@ async function aggregateInstanceLimits(
   });
 
   if (allInstances.length === 0) {
-    // 无实例，不施加实例级限制
     for (const type of paymentTypes) {
-      result[type] = { singleMin: 0, singleMax: 0, allInstancesDailyBlocked: false, hasInstances: false };
+      result[type] = {
+        singleMin: 0,
+        singleMax: 0,
+        allInstancesDailyBlocked: false,
+        maxRemainingCapacity: null,
+        hasInstances: false,
+      };
     }
     return result;
   }
 
   const todayStart = getBizDayStartUTC();
 
-  // 批量查询所有实例今日用量
   const usageRows = await prisma.order.groupBy({
     by: ['providerInstanceId'],
     where: {
@@ -102,7 +120,6 @@ async function aggregateInstanceLimits(
   const usageMap = new Map(usageRows.map((r) => [r.providerInstanceId, Number(r._sum.payAmount ?? 0)]));
 
   for (const type of paymentTypes) {
-    // 筛出支持此渠道的实例
     const supporting = allInstances.filter((inst) => {
       if (!inst.supportedTypes) return true;
       const types = inst.supportedTypes
@@ -113,13 +130,20 @@ async function aggregateInstanceLimits(
     });
 
     if (supporting.length === 0) {
-      result[type] = { singleMin: 0, singleMax: 0, allInstancesDailyBlocked: false, hasInstances: false };
+      result[type] = {
+        singleMin: 0,
+        singleMax: 0,
+        allInstancesDailyBlocked: false,
+        maxRemainingCapacity: null,
+        hasInstances: false,
+      };
       continue;
     }
 
     let aggSingleMin = Infinity;
     let aggSingleMax = 0;
     let allBlocked = true;
+    let maxRemaining: number | null = null; // 所有可用实例中最大的剩余日额度
 
     for (const inst of supporting) {
       let channelLimits: InstanceChannelLimits | undefined;
@@ -136,30 +160,40 @@ async function aggregateInstanceLimits(
       const instMin = channelLimits?.singleMin ?? 0;
       const instMax = channelLimits?.singleMax ?? 0;
       if (instMin > 0 && instMin < aggSingleMin) aggSingleMin = instMin;
-      if (instMin === 0) aggSingleMin = 0; // 有实例不限最小值
+      if (instMin === 0) aggSingleMin = 0;
       if (instMax > aggSingleMax) aggSingleMax = instMax;
-      if (instMax === 0) aggSingleMax = 0; // 有实例不限最大值，则聚合结果也不限
+      if (instMax === 0) aggSingleMax = 0;
 
-      // 日限额：检查是否所有实例都已用满
+      // 日限额：计算剩余容量，判断是否可用
       const instDailyLimit = channelLimits?.dailyLimit;
       if (!instDailyLimit || instDailyLimit <= 0) {
-        // 该实例不限日额，至少有一个可用
+        // 无日限额限制
         allBlocked = false;
+        maxRemaining = null; // null 表示至少有一个实例无限额
       } else {
         const used = usageMap.get(inst.id) ?? 0;
-        if (used < instDailyLimit) {
+        const remaining = Math.max(0, instDailyLimit - used);
+        const effectiveMin = instMin > 0 ? instMin : 0;
+
+        if (remaining > effectiveMin) {
+          // 剩余额度足够下一单（大于最小单笔）
           allBlocked = false;
+          if (maxRemaining !== null) {
+            maxRemaining = Math.max(maxRemaining, remaining);
+          }
+          // maxRemaining === null 时说明已有无限额实例，保持 null
         }
+        // remaining <= effectiveMin: 该实例实质不可用，不影响 allBlocked
       }
     }
 
-    // aggSingleMax === 0 代表不限
     if (aggSingleMin === Infinity) aggSingleMin = 0;
 
     result[type] = {
       singleMin: aggSingleMin,
       singleMax: aggSingleMax,
       allInstancesDailyBlocked: allBlocked,
+      maxRemainingCapacity: maxRemaining,
       hasInstances: true,
     };
   }
@@ -207,15 +241,27 @@ export async function queryMethodLimits(paymentTypes: string[]): Promise<Record<
     const singleMin = inst?.singleMin ?? 0;
     let singleMax = globalSingleMax;
     if (inst?.hasInstances && inst.singleMax > 0) {
-      // 实例有限制时，取全局和实例中较小的
       singleMax = singleMax > 0 ? Math.min(singleMax, inst.singleMax) : inst.singleMax;
     }
+
+    // 实例剩余日容量约束：singleMax 不能超过最大剩余容量
+    if (inst?.hasInstances && inst.maxRemainingCapacity !== null && inst.maxRemainingCapacity >= 0) {
+      singleMax = singleMax > 0 ? Math.min(singleMax, inst.maxRemainingCapacity) : inst.maxRemainingCapacity;
+    }
+
+    // 全局剩余日容量约束
+    if (remaining !== null && remaining >= 0) {
+      singleMax = singleMax > 0 ? Math.min(singleMax, remaining) : remaining;
+    }
+
+    // 最终可用性：如果 singleMax < singleMin，该渠道实质不可用
+    const effectivelyAvailable = globalAvailable && instanceAvailable && (singleMin === 0 || singleMax >= singleMin);
 
     result[type] = {
       dailyLimit: globalDailyLimit,
       used,
       remaining,
-      available: globalAvailable && instanceAvailable,
+      available: effectivelyAvailable,
       singleMin,
       singleMax,
       feeRate,
