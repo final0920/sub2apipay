@@ -48,7 +48,7 @@ function hasCredentialChange(merged: Record<string, string>, existing: Record<st
 
 async function getPendingOrderCount(instanceId: string): Promise<number> {
   return prisma.order.count({
-    where: { providerInstanceId: instanceId, status: { in: ['PENDING', 'PAID', 'RECHARGING'] } },
+    where: { providerInstanceId: instanceId, status: { in: [...PENDING_STATUSES] } },
   });
 }
 
@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { providerKey, name, config, enabled, sortOrder, supportedTypes, limits } = body;
+    const { providerKey, name, config, enabled, sortOrder, supportedTypes, limits, refundEnabled } = body;
 
     const existing = await prisma.paymentProviderInstance.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: '支付实例不存在' }, { status: 404 });
@@ -133,7 +133,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (blocked) return blocked;
     }
 
-    if (enabled !== undefined) data.enabled = enabled;
+    if (enabled !== undefined) {
+      if (typeof enabled !== 'boolean') {
+        return NextResponse.json({ error: 'enabled 必须是布尔值' }, { status: 400 });
+      }
+      data.enabled = enabled;
+    }
     if (supportedTypes !== undefined) data.supportedTypes = supportedTypes;
     if (sortOrder !== undefined) {
       if (!Number.isInteger(sortOrder) || sortOrder < 0) {
@@ -142,6 +147,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       data.sortOrder = sortOrder;
     }
     if (limits !== undefined) data.limits = limits ? JSON.stringify(limits) : null;
+    if (refundEnabled !== undefined) {
+      if (typeof refundEnabled !== 'boolean') {
+        return NextResponse.json({ error: 'refundEnabled 必须是布尔值' }, { status: 400 });
+      }
+      data.refundEnabled = refundEnabled;
+    }
 
     const updated = await prisma.paymentProviderInstance.update({ where: { id }, data });
     return NextResponse.json({

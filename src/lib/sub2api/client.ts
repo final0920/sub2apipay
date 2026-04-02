@@ -188,11 +188,11 @@ export async function getUserSubscriptions(userId: number): Promise<Sub2ApiSubsc
   return (data.data ?? []) as Sub2ApiSubscription[];
 }
 
-export async function extendSubscription(subscriptionId: number, days: number): Promise<void> {
+export async function extendSubscription(subscriptionId: number, days: number, idempotencyKey?: string): Promise<void> {
   const env = getEnv();
   const response = await fetch(`${env.SUB2API_BASE_URL}/api/v1/admin/subscriptions/${subscriptionId}/extend`, {
     method: 'POST',
-    headers: await getHeaders(),
+    headers: await getHeaders(idempotencyKey),
     body: JSON.stringify({ days }),
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });

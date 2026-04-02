@@ -151,6 +151,7 @@ model PaymentProviderInstance {
   enabled        Boolean  @default(true)
   sortOrder      Int      @default(0) @map("sort_order")
   limits         String?  @db.Text // JSON per-channel limits: { "alipay": { "dailyLimit": 10000, "singleLimit": 1000 } }
+  refundEnabled  Boolean  @default(false) @map("refund_enabled")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

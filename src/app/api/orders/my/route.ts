@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           paidAt: true,
           completedAt: true,
+          orderType: true,
+          providerInstanceId: true,
         },
       }),
       prisma.order.count({ where }),
@@ -49,6 +51,19 @@ export async function GET(request: NextRequest) {
     ]);
 
     const sc = Object.fromEntries(statusGroups.map((g) => [g.status, g._count]));
+
+    // 批量查询订单关联实例的退款开关
+    const instanceIds = [...new Set(orders.map((o) => o.providerInstanceId).filter(Boolean))] as string[];
+    const refundEnabledMap = new Map<string, boolean>();
+    if (instanceIds.length > 0) {
+      const instances = await prisma.paymentProviderInstance.findMany({
+        where: { id: { in: instanceIds } },
+        select: { id: true, refundEnabled: true },
+      });
+      for (const inst of instances) {
+        refundEnabledMap.set(inst.id, inst.refundEnabled);
+      }
+    }
 
     return NextResponse.json({
       user: {
@@ -60,12 +75,17 @@ export async function GET(request: NextRequest) {
       },
       orders: orders.map((item) => {
         const derived = deriveOrderState(item);
+        const instanceRefundEnabled = item.providerInstanceId
+          ? (refundEnabledMap.get(item.providerInstanceId) ?? false)
+          : false;
         return {
           id: item.id,
           amount: Number(item.amount),
           status: item.status,
           paymentType: item.paymentType,
           createdAt: item.createdAt,
+          orderType: item.orderType,
+          canRefundRequest: item.orderType === 'balance' && item.status === 'COMPLETED' && instanceRefundEnabled,
           paymentSuccess: derived.paymentSuccess,
           rechargeSuccess: derived.rechargeSuccess,
           rechargeStatus: derived.rechargeStatus,

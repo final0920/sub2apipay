@@ -26,12 +26,13 @@ interface OrderTableProps {
   orders: Order[];
   onRetry: (orderId: string) => void;
   onCancel: (orderId: string) => void;
+  onRefund?: (orderId: string) => void;
   onViewDetail: (orderId: string) => void;
   dark?: boolean;
   locale?: Locale;
 }
 
-export default function OrderTable({ orders, onRetry, onCancel, onViewDetail, dark, locale = 'zh' }: OrderTableProps) {
+export default function OrderTable({ orders, onRetry, onCancel, onRefund, onViewDetail, dark, locale = 'zh' }: OrderTableProps) {
   const currency = locale === 'en' ? '$' : '¥';
   const text =
     locale === 'en'
@@ -49,6 +50,8 @@ export default function OrderTable({ orders, onRetry, onCancel, onViewDetail, da
           actions: 'Actions',
           retry: 'Retry',
           cancel: 'Cancel',
+          refund: 'Refund',
+          retryRefund: 'Retry Refund',
           empty: 'No orders',
         }
       : {
@@ -65,6 +68,8 @@ export default function OrderTable({ orders, onRetry, onCancel, onViewDetail, da
           actions: '操作',
           retry: '重试',
           cancel: '取消',
+          refund: '退款',
+          retryRefund: '重试退款',
           empty: '暂无订单',
         };
 
@@ -204,6 +209,14 @@ export default function OrderTable({ orders, onRetry, onCancel, onViewDetail, da
                         className={`rounded px-2 py-1 text-xs ${dark ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
                       >
                         {text.cancel}
+                      </button>
+                    )}
+                    {(order.status === 'COMPLETED' || order.status === 'REFUND_FAILED') && onRefund && (
+                      <button
+                        onClick={() => onRefund(order.id)}
+                        className={`rounded px-2 py-1 text-xs ${dark ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
+                      >
+                        {order.status === 'REFUND_FAILED' ? text.retryRefund : text.refund}
                       </button>
                     )}
                   </div>

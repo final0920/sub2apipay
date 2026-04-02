@@ -9,6 +9,7 @@ const refundSchema = z.object({
   order_id: z.string().min(1),
   reason: z.string().optional(),
   force: z.boolean().optional().default(false),
+  deduct_balance: z.boolean().optional().default(true),
 });
 
 export async function POST(request: NextRequest) {
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest) {
       orderId: parsed.data.order_id,
       reason: parsed.data.reason,
       force: parsed.data.force,
+      deductBalance: parsed.data.deduct_balance,
       locale,
     });
 

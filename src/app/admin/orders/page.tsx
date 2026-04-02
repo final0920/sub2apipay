@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import OrderTable from '@/components/admin/OrderTable';
 import OrderDetail from '@/components/admin/OrderDetail';
+import RefundDialog from '@/components/admin/RefundDialog';
 import PaginationBar from '@/components/PaginationBar';
 import PayPageLayout from '@/components/PayPageLayout';
 import { resolveLocale } from '@/lib/locale';
@@ -15,6 +16,7 @@ interface AdminOrder {
   userEmail: string | null;
   userNotes: string | null;
   amount: number;
+  payAmount?: number | null;
   status: string;
   paymentType: string;
   createdAt: string;
@@ -24,6 +26,8 @@ interface AdminOrder {
   expiresAt: string;
   srcHost: string | null;
   orderType?: string;
+  subscriptionDays?: number | null;
+  subscriptionGroupId?: number | null;
 }
 
 interface AdminOrderDetail extends AdminOrder {
@@ -71,6 +75,7 @@ function AdminContent() {
           cancelConfirm: 'Cancel this order?',
           cancelFailed: 'Cancel failed',
           cancelRequestFailed: 'Cancel request failed',
+          refundFailed: 'Refund failed',
           loadDetailFailed: 'Failed to load order details',
           title: 'Order Management',
           subtitle: 'View and manage all recharge orders',
@@ -91,6 +96,8 @@ function AdminContent() {
             CANCELLED: 'Cancelled',
             FAILED: 'Recharge failed',
             REFUNDED: 'Refunded',
+            REFUNDING: 'Refunding',
+            REFUND_FAILED: 'Refund Failed',
           },
         }
       : {
@@ -105,6 +112,7 @@ function AdminContent() {
           cancelConfirm: '确认取消该订单？',
           cancelFailed: '取消失败',
           cancelRequestFailed: '取消请求失败',
+          refundFailed: '退款失败',
           loadDetailFailed: '加载订单详情失败',
           title: '订单管理',
           subtitle: '查看和管理所有充值订单',
@@ -125,6 +133,8 @@ function AdminContent() {
             CANCELLED: '已取消',
             FAILED: '充值失败',
             REFUNDED: '已退款',
+            REFUNDING: '退款中',
+            REFUND_FAILED: '退款失败',
           },
         };
 
@@ -139,6 +149,11 @@ function AdminContent() {
   const [error, setError] = useState('');
 
   const [detailOrder, setDetailOrder] = useState<AdminOrderDetail | null>(null);
+  const [refundOrder, setRefundOrder] = useState<AdminOrder | null>(null);
+  const [refundUserBalance, setRefundUserBalance] = useState<number | undefined>(undefined);
+  const [refundSubRemainingDays, setRefundSubRemainingDays] = useState<number | undefined>(undefined);
+  const [refundWarning, setRefundWarning] = useState<string | undefined>(undefined);
+  const [refundRequireForce, setRefundRequireForce] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -217,6 +232,75 @@ function AdminContent() {
     }
   };
 
+  const handleRefund = async (orderId: string) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order || (order.status !== 'COMPLETED' && order.status !== 'REFUND_FAILED')) return;
+    setRefundOrder(order);
+    setRefundWarning(undefined);
+    setRefundRequireForce(false);
+    setRefundUserBalance(undefined);
+    setRefundSubRemainingDays(undefined);
+
+    try {
+      if (order.orderType === 'subscription' && order.subscriptionGroupId) {
+        // 订阅订单：获取用户该分组的活跃订阅剩余天数
+        const subsRes = await fetch(`/api/admin/subscriptions?token=${token}&user_id=${order.userId}&group_id=${order.subscriptionGroupId}&status=active`);
+        if (subsRes.ok) {
+          const subsData = await subsRes.json();
+          const subs = subsData.subscriptions ?? subsData.data?.items ?? [];
+          if (subs.length > 0) {
+            const expiresAt = new Date(subs[0].expires_at);
+            const remaining = Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+            setRefundSubRemainingDays(remaining);
+          } else {
+            setRefundSubRemainingDays(0);
+          }
+        }
+      } else {
+        // 余额订单：获取用户余额
+        const userRes = await fetch(`/api/admin/user-balance?token=${token}&userId=${order.userId}`);
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setRefundUserBalance(userData.balance);
+        }
+      }
+    } catch {
+      // 获取失败不阻塞
+    }
+  };
+
+  const handleConfirmRefund = async (reason: string, force: boolean, deductBalance: boolean) => {
+    if (!refundOrder) return;
+    try {
+      const res = await fetch(`/api/admin/refund?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: refundOrder.id,
+          reason,
+          force,
+          deduct_balance: deductBalance,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || text.refundFailed);
+        return;
+      }
+      if (data.requireForce) {
+        setRefundWarning(data.warning);
+        setRefundRequireForce(true);
+        return;
+      }
+      setRefundOrder(null);
+      setRefundWarning(undefined);
+      setRefundRequireForce(false);
+      await fetchOrders();
+    } catch {
+      setError(text.refundFailed);
+    }
+  };
+
   const handleViewDetail = async (orderId: string) => {
     try {
       const res = await fetch(`/api/admin/orders/${orderId}?token=${token}`);
@@ -229,7 +313,7 @@ function AdminContent() {
     }
   };
 
-  const statuses = ['', 'PENDING', 'PAID', 'RECHARGING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED', 'REFUNDED'];
+  const statuses = ['', 'PENDING', 'PAID', 'RECHARGING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED', 'REFUNDING', 'REFUNDED', 'REFUND_FAILED'];
   const statusLabels: Record<string, string> = text.statuses;
   const orderTypes = ['', 'balance', 'subscription'];
   const orderTypeLabels: Record<string, string> = text.orderTypes;
@@ -329,6 +413,7 @@ function AdminContent() {
             orders={orders}
             onRetry={handleRetry}
             onCancel={handleCancel}
+            onRefund={handleRefund}
             onViewDetail={handleViewDetail}
             dark={isDark}
             locale={locale}
@@ -351,9 +436,28 @@ function AdminContent() {
         isDark={isDark}
       />
 
-      {/* Order Detail */}
       {detailOrder && (
         <OrderDetail order={detailOrder} onClose={() => setDetailOrder(null)} dark={isDark} locale={locale} />
+      )}
+      {refundOrder && (
+        <RefundDialog
+          orderId={refundOrder.id}
+          amount={refundOrder.payAmount ?? refundOrder.amount}
+          orderType={refundOrder.orderType}
+          userBalance={refundUserBalance}
+          subscriptionDays={refundOrder.subscriptionDays ?? undefined}
+          subscriptionRemainingDays={refundSubRemainingDays}
+          warning={refundWarning}
+          requireForce={refundRequireForce}
+          onConfirm={handleConfirmRefund}
+          onCancel={() => {
+            setRefundOrder(null);
+            setRefundWarning(undefined);
+            setRefundRequireForce(false);
+          }}
+          dark={isDark}
+          locale={locale}
+        />
       )}
     </PayPageLayout>
   );

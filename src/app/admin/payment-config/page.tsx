@@ -50,6 +50,7 @@ function getTexts(locale: Locale) {
         instanceName: 'Instance Name',
         instanceProvider: 'Provider Type',
         instanceEnabled: 'Enabled',
+        instanceRefundEnabled: 'Allow Refund',
         instanceConfig: 'Credentials',
         supportedChannels: 'Supported Channels',
         supportedChannelsHint: 'Select which payment channels this instance supports',
@@ -110,6 +111,7 @@ function getTexts(locale: Locale) {
         instanceName: '实例名称',
         instanceProvider: '服务商类型',
         instanceEnabled: '启用',
+        instanceRefundEnabled: '允许退款',
         instanceConfig: '凭证配置',
         supportedChannels: '支持渠道',
         supportedChannelsHint: '选择此实例支持的支付渠道',
@@ -209,6 +211,7 @@ interface ProviderInstanceData {
   enabled: boolean;
   sortOrder: number;
   limits: Record<string, ChannelLimits> | null;
+  refundEnabled: boolean;
   todayAmount?: number;
   createdAt: string;
   updatedAt: string;
@@ -222,6 +225,7 @@ interface InstanceFormData {
   config: Record<string, string>;
   supportedTypes: string[];
   limits: Record<string, ChannelLimits>;
+  refundEnabled: boolean;
 }
 
 // ── Main Content ──
@@ -275,6 +279,7 @@ function PaymentConfigContent() {
     config: {},
     supportedTypes: [],
     limits: {},
+    refundEnabled: false,
   });
   const [instanceSaving, setInstanceSaving] = useState(false);
   const [limitsOpen, setLimitsOpen] = useState(false);
@@ -441,6 +446,7 @@ function PaymentConfigContent() {
           config: instanceForm.config,
           supportedTypes: instanceForm.supportedTypes.join(','),
           limits: Object.keys(instanceForm.limits).length > 0 ? instanceForm.limits : null,
+          refundEnabled: instanceForm.refundEnabled,
         }),
       });
       if (!res.ok) {
@@ -486,6 +492,7 @@ function PaymentConfigContent() {
       config: { ...inst.config },
       supportedTypes: inst.supportedTypes ? inst.supportedTypes.split(',').filter(Boolean) : [],
       limits: inst.limits ?? {},
+      refundEnabled: inst.refundEnabled ?? false,
     });
     setError('');
     setInstanceModalOpen(true);
@@ -502,6 +509,7 @@ function PaymentConfigContent() {
       config: {},
       supportedTypes: PROVIDER_SUPPORTED_TYPES[key] || [],
       limits: {},
+      refundEnabled: false,
     });
     setError('');
     setInstanceModalOpen(true);
@@ -520,6 +528,24 @@ function PaymentConfigContent() {
         return;
       }
       setInstances((prev) => prev.map((i) => (i.id === inst.id ? { ...i, enabled: !inst.enabled } : i)));
+    } catch {
+      setError(locale === 'en' ? 'Failed to update instance' : '更新实例失败');
+    }
+  };
+
+  const toggleInstanceRefundEnabled = async (inst: ProviderInstanceData) => {
+    try {
+      const res = await fetch(`/api/admin/provider-instances/${inst.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ refundEnabled: !inst.refundEnabled }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || (locale === 'en' ? 'Failed to update instance' : '更新实例失败'));
+        return;
+      }
+      setInstances((prev) => prev.map((i) => (i.id === inst.id ? { ...i, refundEnabled: !inst.refundEnabled } : i)));
     } catch {
       setError(locale === 'en' ? 'Failed to update instance' : '更新实例失败');
     }
@@ -1012,6 +1038,12 @@ function PaymentConfigContent() {
                                           {t.todayAmount}: ¥{inst.todayAmount}
                                         </span>
                                       )}
+                                      <div className="flex items-center gap-1">
+                                        <Toggle value={inst.refundEnabled} onChange={() => toggleInstanceRefundEnabled(inst)} />
+                                        <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                          {t.instanceRefundEnabled}
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       <button
@@ -1135,14 +1167,25 @@ function PaymentConfigContent() {
                   />
                 </div>
                 <div className="flex items-end pb-1">
-                  <div className="flex items-center gap-2">
-                    <Toggle
-                      value={instanceForm.enabled}
-                      onChange={() => setInstanceForm({ ...instanceForm, enabled: !instanceForm.enabled })}
-                    />
-                    <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                      {t.instanceEnabled}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Toggle
+                        value={instanceForm.enabled}
+                        onChange={() => setInstanceForm({ ...instanceForm, enabled: !instanceForm.enabled })}
+                      />
+                      <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {t.instanceEnabled}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Toggle
+                        value={instanceForm.refundEnabled}
+                        onChange={() => setInstanceForm({ ...instanceForm, refundEnabled: !instanceForm.refundEnabled })}
+                      />
+                      <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {t.instanceRefundEnabled}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

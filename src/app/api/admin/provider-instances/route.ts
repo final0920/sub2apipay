@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { providerKey, name, config, enabled, sortOrder, supportedTypes, limits } = body;
+    const { providerKey, name, config, enabled, sortOrder, supportedTypes, limits, refundEnabled } = body;
 
     // Validate required fields
     if (!providerKey || typeof providerKey !== 'string') {
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
         enabled: enabled ?? true,
         sortOrder: sortOrder ?? 0,
         limits: limits ? JSON.stringify(limits) : null,
+        refundEnabled: refundEnabled === true,
       },
     });
 

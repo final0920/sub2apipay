@@ -13,6 +13,7 @@ import {
   addBalance,
   getGroup,
   getUserSubscriptions,
+  extendSubscription,
 } from '@/lib/sub2api/client';
 import { computeValidityDays, type ValidityUnit } from '@/lib/subscription-utils';
 import { Prisma } from '@prisma/client';
@@ -1119,6 +1120,7 @@ export interface RefundInput {
   orderId: string;
   reason?: string;
   force?: boolean;
+  deductBalance?: boolean;
   locale?: Locale;
 }
 
@@ -1126,16 +1128,19 @@ export interface RefundResult {
   success: boolean;
   warning?: string;
   requireForce?: boolean;
+  balanceDeducted?: number;
+  subscriptionDaysDeducted?: number;
 }
 
 export async function processRefund(input: RefundInput): Promise<RefundResult> {
   const locale = input.locale ?? 'zh';
+  const deductBalance = input.deductBalance ?? true;
   const order = await prisma.order.findUnique({ where: { id: input.orderId } });
   if (!order) throw new OrderError('NOT_FOUND', message(locale, '订单不存在', 'Order not found'), 404);
-  if (order.status !== ORDER_STATUS.COMPLETED) {
+  if (order.status !== ORDER_STATUS.COMPLETED && order.status !== ORDER_STATUS.REFUND_FAILED) {
     throw new OrderError(
       'INVALID_STATUS',
-      message(locale, '仅已完成订单允许退款', 'Only completed orders can be refunded'),
+      message(locale, '仅已完成或退款失败的订单允许退款', 'Only completed or refund-failed orders can be refunded'),
       400,
     );
   }
@@ -1143,31 +1148,60 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
   const rechargeAmount = Number(order.amount);
   const refundAmount = Number(order.payAmount ?? order.amount);
 
-  if (!input.force) {
-    try {
-      const user = await getUser(order.userId);
-      if (user.balance < rechargeAmount) {
-        return {
-          success: false,
-          warning: message(
-            locale,
-            `用户余额 ${user.balance} 小于需退款的充值金额 ${rechargeAmount}`,
-            `User balance ${user.balance} is lower than refund ${rechargeAmount}`,
-          ),
-          requireForce: true,
-        };
+  // 计算实际扣减金额
+  let actualBalanceDeduction = 0;
+  let actualSubscriptionDaysDeduction = 0;
+  let userBalance = 0;
+  let subscriptionInfo: { id: number; remainingDays: number } | null = null;
+
+  if (deductBalance) {
+    // 获取用户余额/订阅信息
+    if (order.orderType === 'subscription') {
+      // 订阅订单：查询用户该分组的活跃订阅
+      if (order.subscriptionGroupId && order.subscriptionDays) {
+        try {
+          const userSubs = await getUserSubscriptions(order.userId);
+          const activeSub = userSubs.find(
+            (s) => s.group_id === order.subscriptionGroupId && s.status === 'active',
+          );
+          if (activeSub) {
+            const remainingDays = Math.max(
+              0,
+              Math.ceil((new Date(activeSub.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
+            );
+            subscriptionInfo = { id: activeSub.id, remainingDays };
+            actualSubscriptionDaysDeduction = Math.min(order.subscriptionDays, remainingDays);
+          }
+        } catch {
+          if (!input.force) {
+            return {
+              success: false,
+              warning: message(locale, '无法获取订阅信息，请勾选强制退款', 'Cannot fetch subscription info, use force'),
+              requireForce: true,
+            };
+          }
+        }
       }
-    } catch {
-      return {
-        success: false,
-        warning: message(locale, '无法获取用户余额，请使用 force=true', 'Cannot fetch user balance, use force=true'),
-        requireForce: true,
-      };
+    } else {
+      // 余额订单：查询用户余额
+      try {
+        const user = await getUser(order.userId);
+        userBalance = user.balance;
+        actualBalanceDeduction = Math.min(rechargeAmount, userBalance);
+      } catch {
+        if (!input.force) {
+          return {
+            success: false,
+            warning: message(locale, '无法获取用户余额，请勾选强制退款', 'Cannot fetch user balance, use force'),
+            requireForce: true,
+          };
+        }
+      }
     }
   }
 
   const lockResult = await prisma.order.updateMany({
-    where: { id: input.orderId, status: ORDER_STATUS.COMPLETED },
+    where: { id: input.orderId, status: { in: [ORDER_STATUS.COMPLETED, ORDER_STATUS.REFUND_FAILED] } },
     data: { status: ORDER_STATUS.REFUNDING },
   });
   if (lockResult.count === 0) {
@@ -1179,19 +1213,34 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
   }
 
   try {
-    // 1. 先扣减用户余额（安全方向：先扣后退）
-    await subtractBalance(
-      order.userId,
-      rechargeAmount,
-      `sub2apipay refund order:${order.id}`,
-      `sub2apipay:refund:${order.id}`,
-    );
+    // 1. 扣减用户余额/订阅（安全方向：先扣后退）
+    if (deductBalance) {
+      if (order.orderType === 'subscription') {
+        // 扣减订阅天数
+        if (subscriptionInfo && actualSubscriptionDaysDeduction > 0) {
+          await extendSubscription(
+            subscriptionInfo.id,
+            -actualSubscriptionDaysDeduction,
+            `sub2apipay:refund-sub:${order.id}`,
+          );
+        }
+      } else {
+        // 扣减余额
+        if (actualBalanceDeduction > 0) {
+          await subtractBalance(
+            order.userId,
+            actualBalanceDeduction,
+            `sub2apipay refund order:${order.id}`,
+            `sub2apipay:refund:${order.id}`,
+          );
+        }
+      }
+    }
 
     // 2. 调用支付网关退款
     if (order.paymentTradeNo) {
       try {
         let provider;
-        // 多实例：使用实例配置创建 provider
         if (order.providerInstanceId) {
           const instConfig = await getInstanceConfig(order.providerInstanceId);
           if (instConfig) {
@@ -1210,35 +1259,114 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
           reason: input.reason,
         });
       } catch (gatewayError) {
-        // 3. 网关退款失败 — 恢复已扣减的余额
-        try {
-          await addBalance(
-            order.userId,
-            rechargeAmount,
-            `sub2apipay refund rollback order:${order.id}`,
-            `sub2apipay:refund-rollback:${order.id}`,
-          );
-        } catch (rollbackError) {
-          // 余额恢复也失败，记录审计日志并标记需要补偿，便于定时任务或管理员重试
-          console.error(
-            `[CRITICAL] Refund rollback failed for order ${input.orderId}: balance deducted ${rechargeAmount} but gateway refund and balance restoration both failed. Manual intervention required.`,
-          );
+        // 3. 网关退款失败 — 恢复已扣减的余额/订阅
+        let rollbackFailed = false;
+        if (deductBalance) {
+          if (order.orderType === 'subscription') {
+            if (subscriptionInfo && actualSubscriptionDaysDeduction > 0) {
+              try {
+                await extendSubscription(
+                  subscriptionInfo.id,
+                  actualSubscriptionDaysDeduction,
+                  `sub2apipay:refund-sub-rollback:${order.id}`,
+                );
+              } catch (rollbackError) {
+                rollbackFailed = true;
+                console.error(
+                  `[CRITICAL] Subscription rollback failed for order ${input.orderId}: ${actualSubscriptionDaysDeduction} days deducted but gateway refund failed. Manual intervention required.`,
+                );
+                await prisma.auditLog.create({
+                  data: {
+                    orderId: input.orderId,
+                    action: 'REFUND_ROLLBACK_FAILED',
+                    detail: JSON.stringify({
+                      gatewayError: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
+                      rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                      subscriptionDaysDeducted: actualSubscriptionDaysDeduction,
+                    }),
+                    operator: 'admin',
+                  },
+                });
+              }
+            }
+          } else if (actualBalanceDeduction > 0) {
+            try {
+              await addBalance(
+                order.userId,
+                actualBalanceDeduction,
+                `sub2apipay refund rollback order:${order.id}`,
+                `sub2apipay:refund-rollback:${order.id}`,
+              );
+            } catch (rollbackError) {
+              rollbackFailed = true;
+              console.error(
+                `[CRITICAL] Refund rollback failed for order ${input.orderId}: balance deducted ${actualBalanceDeduction} but gateway refund and balance restoration both failed. Manual intervention required.`,
+              );
+              await prisma.auditLog.create({
+                data: {
+                  orderId: input.orderId,
+                  action: 'REFUND_ROLLBACK_FAILED',
+                  detail: JSON.stringify({
+                    gatewayError: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
+                    rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                    balanceDeducted: actualBalanceDeduction,
+                    needsBalanceCompensation: true,
+                  }),
+                  operator: 'admin',
+                },
+              });
+            }
+          }
+        }
+
+        if (rollbackFailed) {
+          // 回滚失败 — 标记为 REFUND_FAILED，需人工介入
+          await prisma.order.update({
+            where: { id: input.orderId },
+            data: {
+              status: ORDER_STATUS.REFUND_FAILED,
+              failedAt: new Date(),
+              failedReason: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
+            },
+          });
           await prisma.auditLog.create({
             data: {
               orderId: input.orderId,
-              action: 'REFUND_ROLLBACK_FAILED',
-              detail: JSON.stringify({
-                gatewayError: gatewayError instanceof Error ? gatewayError.message : String(gatewayError),
-                rollbackError: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-                rechargeAmount,
-                needsBalanceCompensation: true,
-              }),
+              action: 'REFUND_FAILED',
+              detail: `Gateway refund failed and rollback also failed: ${gatewayError instanceof Error ? gatewayError.message : String(gatewayError)}`,
+              operator: 'admin',
+            },
+          });
+        } else {
+          // 回滚成功 — 恢复到 COMPLETED
+          await prisma.order.update({
+            where: { id: input.orderId },
+            data: { status: ORDER_STATUS.COMPLETED },
+          });
+          await prisma.auditLog.create({
+            data: {
+              orderId: input.orderId,
+              action: 'REFUND_GATEWAY_FAILED',
+              detail: `Gateway refund failed, balance/subscription rolled back: ${gatewayError instanceof Error ? gatewayError.message : String(gatewayError)}`,
               operator: 'admin',
             },
           });
         }
+        if (gatewayError instanceof Error) {
+          (gatewayError as Error & { _refundHandled?: boolean })._refundHandled = true;
+        }
         throw gatewayError;
       }
+    } else {
+      // 无支付流水号，跳过网关退款
+      await prisma.auditLog.create({
+        data: {
+          orderId: input.orderId,
+          action: 'REFUND_NO_TRADE_NO',
+          detail: 'No paymentTradeNo, skipped gateway refund',
+          operator: 'admin',
+        },
+      });
     }
 
     await prisma.order.update({
@@ -1256,30 +1384,45 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
       data: {
         orderId: input.orderId,
         action: 'REFUND_SUCCESS',
-        detail: JSON.stringify({ rechargeAmount, refundAmount, reason: input.reason, force: input.force }),
+        detail: JSON.stringify({
+          rechargeAmount,
+          refundAmount,
+          reason: input.reason,
+          force: input.force,
+          deductBalance,
+          balanceDeducted: actualBalanceDeduction,
+          subscriptionDaysDeducted: actualSubscriptionDaysDeduction,
+        }),
         operator: 'admin',
       },
     });
 
-    return { success: true };
+    return {
+      success: true,
+      balanceDeducted: actualBalanceDeduction,
+      subscriptionDaysDeducted: actualSubscriptionDaysDeduction,
+    };
   } catch (error) {
-    await prisma.order.update({
-      where: { id: input.orderId },
-      data: {
-        status: ORDER_STATUS.REFUND_FAILED,
-        failedAt: new Date(),
-        failedReason: error instanceof Error ? error.message : String(error),
-      },
-    });
+    // 网关退款失败时，内层已处理状态和审计日志，跳过外层覆盖
+    if (!(error instanceof Error && (error as Error & { _refundHandled?: boolean })._refundHandled)) {
+      await prisma.order.update({
+        where: { id: input.orderId },
+        data: {
+          status: ORDER_STATUS.REFUND_FAILED,
+          failedAt: new Date(),
+          failedReason: error instanceof Error ? error.message : String(error),
+        },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        orderId: input.orderId,
-        action: 'REFUND_FAILED',
-        detail: error instanceof Error ? error.message : String(error),
-        operator: 'admin',
-      },
-    });
+      await prisma.auditLog.create({
+        data: {
+          orderId: input.orderId,
+          action: 'REFUND_FAILED',
+          detail: error instanceof Error ? error.message : String(error),
+          operator: 'admin',
+        },
+      });
+    }
 
     throw error;
   }

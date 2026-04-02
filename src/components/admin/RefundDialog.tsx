@@ -6,7 +6,11 @@ import type { Locale } from '@/lib/locale';
 interface RefundDialogProps {
   orderId: string;
   amount: number;
-  onConfirm: (reason: string, force: boolean) => Promise<void>;
+  orderType?: string;
+  userBalance?: number;
+  subscriptionDays?: number;
+  subscriptionRemainingDays?: number;
+  onConfirm: (reason: string, force: boolean, deductBalance: boolean) => Promise<void>;
   onCancel: () => void;
   warning?: string;
   requireForce?: boolean;
@@ -17,6 +21,10 @@ interface RefundDialogProps {
 export default function RefundDialog({
   orderId,
   amount,
+  orderType = 'balance',
+  userBalance,
+  subscriptionDays,
+  subscriptionRemainingDays,
   onConfirm,
   onCancel,
   warning,
@@ -26,9 +34,11 @@ export default function RefundDialog({
 }: RefundDialogProps) {
   const [reason, setReason] = useState('');
   const [force, setForce] = useState(false);
+  const [deductBalance, setDeductBalance] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const currency = locale === 'en' ? '$' : '¥';
+  const currency = '¥';
+  const isSub = orderType === 'subscription';
   const text =
     locale === 'en'
       ? {
@@ -37,7 +47,16 @@ export default function RefundDialog({
           amount: 'Refund Amount',
           reason: 'Refund Reason',
           reasonPlaceholder: 'Enter refund reason (optional)',
-          forceRefund: 'Force refund (balance may become negative)',
+          forceRefund: 'Force refund (ignore balance check)',
+          deductLabel: isSub ? 'Deduct subscription days' : 'Deduct user balance',
+          deductHint: isSub ? 'Reduce subscription period for this order' : 'Subtract recharged amount from user balance',
+          userBalance: 'User Balance',
+          rechargeAmount: 'Recharge Amount',
+          subDays: 'Order Days',
+          subRemaining: 'Remaining Days',
+          insufficientBalance: `Insufficient balance — will deduct to ${currency}0`,
+          insufficientDays: 'Insufficient days — will deduct to 0 days',
+          noDeduction: 'Will NOT deduct user balance / subscription',
           cancel: 'Cancel',
           confirm: 'Confirm Refund',
           processing: 'Processing...',
@@ -48,7 +67,16 @@ export default function RefundDialog({
           amount: '退款金额',
           reason: '退款原因',
           reasonPlaceholder: '请输入退款原因（可选）',
-          forceRefund: '强制退款（余额可能扣为负数）',
+          forceRefund: '强制退款（忽略余额检查）',
+          deductLabel: isSub ? '扣减订阅天数' : '扣除用户余额',
+          deductHint: isSub ? '缩短该订单对应的订阅期限' : '从用户余额中扣回充值金额',
+          userBalance: '用户余额',
+          rechargeAmount: '充值金额',
+          subDays: '订单天数',
+          subRemaining: '剩余天数',
+          insufficientBalance: `余额不足，将扣至 ${currency}0`,
+          insufficientDays: '剩余天数不足，将扣至 0 天',
+          noDeduction: '将不扣除用户余额/订阅期限',
           cancel: '取消',
           confirm: '确认退款',
           processing: '处理中...',
@@ -65,11 +93,15 @@ export default function RefundDialog({
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      await onConfirm(reason, force);
+      await onConfirm(reason, force, deductBalance);
     } finally {
       setLoading(false);
     }
   };
+
+  const balanceInsufficient = !isSub && userBalance != null && userBalance < amount;
+  const daysInsufficient =
+    isSub && subscriptionRemainingDays != null && subscriptionDays != null && subscriptionRemainingDays < subscriptionDays;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -90,12 +122,86 @@ export default function RefundDialog({
             </div>
           </div>
 
+          {/* 扣除余额/订阅开关 */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={deductBalance}
+              onChange={(e) => setDeductBalance(e.target.checked)}
+              className={['rounded', dark ? 'border-slate-600' : 'border-gray-300'].join(' ')}
+            />
+            <div>
+              <span className={dark ? 'text-slate-200' : 'text-gray-700'}>{text.deductLabel}</span>
+              <span className={`ml-2 text-xs ${dark ? 'text-slate-400' : 'text-gray-500'}`}>{text.deductHint}</span>
+            </div>
+          </label>
+
+          {/* 余额/订阅信息 */}
+          {deductBalance && !isSub && userBalance != null && (
+            <div className={['grid grid-cols-2 gap-3', dark ? 'text-slate-300' : 'text-gray-700'].join(' ')}>
+              <div className={['rounded-lg p-3 text-sm', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
+                <div className={dark ? 'text-slate-400' : 'text-gray-500'}>{text.userBalance}</div>
+                <div className="mt-1 font-semibold">
+                  {currency}
+                  {userBalance.toFixed(2)}
+                </div>
+              </div>
+              <div className={['rounded-lg p-3 text-sm', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
+                <div className={dark ? 'text-slate-400' : 'text-gray-500'}>{text.rechargeAmount}</div>
+                <div className="mt-1 font-semibold">
+                  {currency}
+                  {amount.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {deductBalance && isSub && subscriptionDays != null && (
+            <div className={['grid grid-cols-2 gap-3', dark ? 'text-slate-300' : 'text-gray-700'].join(' ')}>
+              <div className={['rounded-lg p-3 text-sm', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
+                <div className={dark ? 'text-slate-400' : 'text-gray-500'}>{text.subRemaining}</div>
+                <div className="mt-1 font-semibold">{subscriptionRemainingDays ?? '-'}</div>
+              </div>
+              <div className={['rounded-lg p-3 text-sm', dark ? 'bg-slate-800' : 'bg-gray-50'].join(' ')}>
+                <div className={dark ? 'text-slate-400' : 'text-gray-500'}>{text.subDays}</div>
+                <div className="mt-1 font-semibold">{subscriptionDays}</div>
+              </div>
+            </div>
+          )}
+
+          {/* 不足提示 */}
+          {deductBalance && balanceInsufficient && (
+            <div
+              className={['rounded-lg p-3 text-sm', dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'].join(
+                ' ',
+              )}
+            >
+              {text.insufficientBalance}
+            </div>
+          )}
+          {deductBalance && daysInsufficient && (
+            <div
+              className={['rounded-lg p-3 text-sm', dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'].join(
+                ' ',
+              )}
+            >
+              {text.insufficientDays}
+            </div>
+          )}
+
+          {!deductBalance && (
+            <div
+              className={['rounded-lg p-3 text-sm', dark ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'].join(' ')}
+            >
+              {text.noDeduction}
+            </div>
+          )}
+
           {warning && (
             <div
-              className={[
-                'rounded-lg p-3 text-sm',
-                dark ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700',
-              ].join(' ')}
+              className={['rounded-lg p-3 text-sm', dark ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700'].join(
+                ' ',
+              )}
             >
               {warning}
             </div>
@@ -135,9 +241,7 @@ export default function RefundDialog({
             onClick={onCancel}
             className={[
               'flex-1 rounded-lg border py-2 text-sm',
-              dark
-                ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50',
+              dark ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50',
             ].join(' ')}
           >
             {text.cancel}
