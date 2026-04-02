@@ -289,9 +289,7 @@ describe('processRefund', () => {
     mockOrderFindUnique.mockResolvedValue(order);
     // 用户有一个 group_id=10 的活跃订阅，剩余 60 天
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-    mockGetUserSubscriptions.mockResolvedValue([
-      { id: 101, group_id: 10, status: 'active', expires_at: expiresAt },
-    ]);
+    mockGetUserSubscriptions.mockResolvedValue([{ id: 101, group_id: 10, status: 'active', expires_at: expiresAt }]);
 
     const result = await processRefund({ orderId: 'order-001', deductBalance: true });
 
@@ -306,9 +304,7 @@ describe('processRefund', () => {
     mockOrderFindUnique.mockResolvedValue(order);
     // 仅剩 10 天
     const expiresAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
-    mockGetUserSubscriptions.mockResolvedValue([
-      { id: 101, group_id: 10, status: 'active', expires_at: expiresAt },
-    ]);
+    mockGetUserSubscriptions.mockResolvedValue([{ id: 101, group_id: 10, status: 'active', expires_at: expiresAt }]);
 
     const result = await processRefund({ orderId: 'order-001', deductBalance: true });
 
@@ -391,9 +387,7 @@ describe('processRefund', () => {
     const order = makeSubscriptionOrder();
     mockOrderFindUnique.mockResolvedValue(order);
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-    mockGetUserSubscriptions.mockResolvedValue([
-      { id: 101, group_id: 10, status: 'active', expires_at: expiresAt },
-    ]);
+    mockGetUserSubscriptions.mockResolvedValue([{ id: 101, group_id: 10, status: 'active', expires_at: expiresAt }]);
     mockProviderRefund.mockRejectedValue(new Error('gateway error'));
 
     await expect(processRefund({ orderId: 'order-001' })).rejects.toThrow('gateway error');
@@ -463,7 +457,8 @@ describe('processRefund', () => {
 
     // detail 应包含回滚失败信息
     const rollbackCall = mockAuditLogCreate.mock.calls.find(
-      (call: unknown[]) => ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_ROLLBACK_FAILED',
+      (call: unknown[]) =>
+        ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_ROLLBACK_FAILED',
     );
     expect(rollbackCall).toBeTruthy();
     const detail = JSON.parse((rollbackCall![0] as { data: { detail: string } }).data.detail);
@@ -485,9 +480,7 @@ describe('processRefund', () => {
     const order = makeSubscriptionOrder();
     mockOrderFindUnique.mockResolvedValue(order);
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-    mockGetUserSubscriptions.mockResolvedValue([
-      { id: 101, group_id: 10, status: 'active', expires_at: expiresAt },
-    ]);
+    mockGetUserSubscriptions.mockResolvedValue([{ id: 101, group_id: 10, status: 'active', expires_at: expiresAt }]);
     mockProviderRefund.mockRejectedValue(new Error('gateway fail'));
     // 第一次 extendSubscription(-30) 成功，第二次 extendSubscription(30) 失败
     mockExtendSubscription
@@ -513,7 +506,8 @@ describe('processRefund', () => {
     expect(completedCalls).toHaveLength(0);
 
     const rollbackCall = mockAuditLogCreate.mock.calls.find(
-      (call: unknown[]) => ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_ROLLBACK_FAILED',
+      (call: unknown[]) =>
+        ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_ROLLBACK_FAILED',
     );
     expect(rollbackCall).toBeTruthy();
     const detail = JSON.parse((rollbackCall![0] as { data: { detail: string } }).data.detail);
@@ -562,9 +556,7 @@ describe('processRefund', () => {
     const order = makeSubscriptionOrder();
     mockOrderFindUnique.mockResolvedValue(order);
     const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
-    mockGetUserSubscriptions.mockResolvedValue([
-      { id: 101, group_id: 10, status: 'active', expires_at: expiresAt },
-    ]);
+    mockGetUserSubscriptions.mockResolvedValue([{ id: 101, group_id: 10, status: 'active', expires_at: expiresAt }]);
 
     await processRefund({ orderId: 'order-001', deductBalance: true });
 
@@ -599,9 +591,7 @@ describe('processRefund', () => {
     await processRefund({ orderId: 'order-001' });
 
     // 网关退款金额应为 amount（100）
-    expect(mockProviderRefund).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 100 }),
-    );
+    expect(mockProviderRefund).toHaveBeenCalledWith(expect.objectContaining({ amount: 100 }));
   });
 
   it('通过 providerInstanceId 查询实例配置', async () => {
@@ -706,9 +696,7 @@ describe('processRefund', () => {
     mockOrderFindUnique.mockResolvedValue(order);
     mockProviderRefund.mockRejectedValue(new Error('gateway fail'));
 
-    await expect(
-      processRefund({ orderId: 'order-001', deductBalance: false }),
-    ).rejects.toThrow('gateway fail');
+    await expect(processRefund({ orderId: 'order-001', deductBalance: false })).rejects.toThrow('gateway fail');
 
     // 不应调用 addBalance 回滚
     expect(mockAddBalance).not.toHaveBeenCalled();
@@ -721,9 +709,7 @@ describe('processRefund', () => {
     mockOrderFindUnique.mockResolvedValue(order);
     mockProviderRefund.mockRejectedValue(new Error('gateway fail'));
 
-    await expect(
-      processRefund({ orderId: 'order-001', deductBalance: false }),
-    ).rejects.toThrow('gateway fail');
+    await expect(processRefund({ orderId: 'order-001', deductBalance: false })).rejects.toThrow('gateway fail');
 
     // 不扣减，不回滚
     expect(mockSubtractBalance).not.toHaveBeenCalled();
@@ -782,7 +768,8 @@ describe('processRefund', () => {
     );
     // 不应记录 REFUND_GATEWAY_FAILED
     const gatewayFailedCall = mockAuditLogCreate.mock.calls.find(
-      (call: unknown[]) => ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_GATEWAY_FAILED',
+      (call: unknown[]) =>
+        ((call as unknown[])[0] as { data: { action: string } }).data.action === 'REFUND_GATEWAY_FAILED',
     );
     expect(gatewayFailedCall).toBeUndefined();
   });
@@ -893,15 +880,8 @@ describe('processRefund', () => {
     await processRefund({ orderId: 'order-001' });
 
     // 网关退款使用 payAmount
-    expect(mockProviderRefund).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 105.5 }),
-    );
+    expect(mockProviderRefund).toHaveBeenCalledWith(expect.objectContaining({ amount: 105.5 }));
     // 余额扣减使用 amount（rechargeAmount）
-    expect(mockSubtractBalance).toHaveBeenCalledWith(
-      42,
-      100,
-      expect.any(String),
-      expect.any(String),
-    );
+    expect(mockSubtractBalance).toHaveBeenCalledWith(42, 100, expect.any(String), expect.any(String));
   });
 });

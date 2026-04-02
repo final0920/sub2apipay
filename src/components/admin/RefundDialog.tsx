@@ -49,7 +49,9 @@ export default function RefundDialog({
           reasonPlaceholder: 'Enter refund reason (optional)',
           forceRefund: 'Force refund (ignore balance check)',
           deductLabel: isSub ? 'Deduct subscription days' : 'Deduct user balance',
-          deductHint: isSub ? 'Reduce subscription period for this order' : 'Subtract recharged amount from user balance',
+          deductHint: isSub
+            ? 'Reduce subscription period for this order'
+            : 'Subtract recharged amount from user balance',
           userBalance: 'User Balance',
           rechargeAmount: 'Recharge Amount',
           subDays: 'Order Days',
@@ -101,7 +103,10 @@ export default function RefundDialog({
 
   const balanceInsufficient = !isSub && userBalance != null && userBalance < amount;
   const daysInsufficient =
-    isSub && subscriptionRemainingDays != null && subscriptionDays != null && subscriptionRemainingDays < subscriptionDays;
+    isSub &&
+    subscriptionRemainingDays != null &&
+    subscriptionDays != null &&
+    subscriptionRemainingDays < subscriptionDays;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -172,18 +177,20 @@ export default function RefundDialog({
           {/* 不足提示 */}
           {deductBalance && balanceInsufficient && (
             <div
-              className={['rounded-lg p-3 text-sm', dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'].join(
-                ' ',
-              )}
+              className={[
+                'rounded-lg p-3 text-sm',
+                dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700',
+              ].join(' ')}
             >
               {text.insufficientBalance}
             </div>
           )}
           {deductBalance && daysInsufficient && (
             <div
-              className={['rounded-lg p-3 text-sm', dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700'].join(
-                ' ',
-              )}
+              className={[
+                'rounded-lg p-3 text-sm',
+                dark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-50 text-amber-700',
+              ].join(' ')}
             >
               {text.insufficientDays}
             </div>
@@ -191,7 +198,10 @@ export default function RefundDialog({
 
           {!deductBalance && (
             <div
-              className={['rounded-lg p-3 text-sm', dark ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'].join(' ')}
+              className={[
+                'rounded-lg p-3 text-sm',
+                dark ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700',
+              ].join(' ')}
             >
               {text.noDeduction}
             </div>
@@ -199,9 +209,10 @@ export default function RefundDialog({
 
           {warning && (
             <div
-              className={['rounded-lg p-3 text-sm', dark ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700'].join(
-                ' ',
-              )}
+              className={[
+                'rounded-lg p-3 text-sm',
+                dark ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-50 text-yellow-700',
+              ].join(' ')}
             >
               {warning}
             </div>
@@ -241,7 +252,9 @@ export default function RefundDialog({
             onClick={onCancel}
             className={[
               'flex-1 rounded-lg border py-2 text-sm',
-              dark ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50',
+              dark
+                ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
+                : 'border-gray-300 text-gray-600 hover:bg-gray-50',
             ].join(' ')}
           >
             {text.cancel}

@@ -258,7 +258,7 @@ describe('GET /api/orders/my - canRefundRequest', () => {
     const res = await GET(createRequest());
     const data = await res.json();
 
-    expect(data.orders[0].canRefundRequest).toBe(true);  // balance + COMPLETED + refundEnabled
+    expect(data.orders[0].canRefundRequest).toBe(true); // balance + COMPLETED + refundEnabled
     expect(data.orders[1].canRefundRequest).toBe(false); // subscription
     expect(data.orders[2].canRefundRequest).toBe(false); // PENDING
   });

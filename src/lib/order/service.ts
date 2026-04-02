@@ -1161,9 +1161,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
       if (order.subscriptionGroupId && order.subscriptionDays) {
         try {
           const userSubs = await getUserSubscriptions(order.userId);
-          const activeSub = userSubs.find(
-            (s) => s.group_id === order.subscriptionGroupId && s.status === 'active',
-          );
+          const activeSub = userSubs.find((s) => s.group_id === order.subscriptionGroupId && s.status === 'active');
           if (activeSub) {
             const remainingDays = Math.max(
               0,

@@ -32,7 +32,15 @@ interface OrderTableProps {
   locale?: Locale;
 }
 
-export default function OrderTable({ orders, onRetry, onCancel, onRefund, onViewDetail, dark, locale = 'zh' }: OrderTableProps) {
+export default function OrderTable({
+  orders,
+  onRetry,
+  onCancel,
+  onRefund,
+  onViewDetail,
+  dark,
+  locale = 'zh',
+}: OrderTableProps) {
   const currency = locale === 'en' ? '$' : '¥';
   const text =
     locale === 'en'

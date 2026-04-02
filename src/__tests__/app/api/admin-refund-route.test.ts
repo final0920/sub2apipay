@@ -98,9 +98,7 @@ describe('POST /api/admin/refund', () => {
   });
 
   it('passes reason correctly', async () => {
-    const res = await POST(
-      createRequest({ order_id: 'order-004', reason: '用户申请退款' }),
-    );
+    const res = await POST(createRequest({ order_id: 'order-004', reason: '用户申请退款' }));
     expect(res.status).toBe(200);
     expect(mockProcessRefund).toHaveBeenCalledWith(
       expect.objectContaining({

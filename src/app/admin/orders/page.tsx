@@ -244,7 +244,9 @@ function AdminContent() {
     try {
       if (order.orderType === 'subscription' && order.subscriptionGroupId) {
         // 订阅订单：获取用户该分组的活跃订阅剩余天数
-        const subsRes = await fetch(`/api/admin/subscriptions?token=${token}&user_id=${order.userId}&group_id=${order.subscriptionGroupId}&status=active`);
+        const subsRes = await fetch(
+          `/api/admin/subscriptions?token=${token}&user_id=${order.userId}&group_id=${order.subscriptionGroupId}&status=active`,
+        );
         if (subsRes.ok) {
           const subsData = await subsRes.json();
           const subs = subsData.subscriptions ?? subsData.data?.items ?? [];
@@ -313,7 +315,19 @@ function AdminContent() {
     }
   };
 
-  const statuses = ['', 'PENDING', 'PAID', 'RECHARGING', 'COMPLETED', 'EXPIRED', 'CANCELLED', 'FAILED', 'REFUNDING', 'REFUNDED', 'REFUND_FAILED'];
+  const statuses = [
+    '',
+    'PENDING',
+    'PAID',
+    'RECHARGING',
+    'COMPLETED',
+    'EXPIRED',
+    'CANCELLED',
+    'FAILED',
+    'REFUNDING',
+    'REFUNDED',
+    'REFUND_FAILED',
+  ];
   const statusLabels: Record<string, string> = text.statuses;
   const orderTypes = ['', 'balance', 'subscription'];
   const orderTypeLabels: Record<string, string> = text.orderTypes;

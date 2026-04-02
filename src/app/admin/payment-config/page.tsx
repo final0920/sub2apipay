@@ -1039,7 +1039,10 @@ function PaymentConfigContent() {
                                         </span>
                                       )}
                                       <div className="flex items-center gap-1">
-                                        <Toggle value={inst.refundEnabled} onChange={() => toggleInstanceRefundEnabled(inst)} />
+                                        <Toggle
+                                          value={inst.refundEnabled}
+                                          onChange={() => toggleInstanceRefundEnabled(inst)}
+                                        />
                                         <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                                           {t.instanceRefundEnabled}
                                         </span>
@@ -1180,7 +1183,9 @@ function PaymentConfigContent() {
                     <div className="flex items-center gap-2">
                       <Toggle
                         value={instanceForm.refundEnabled}
-                        onChange={() => setInstanceForm({ ...instanceForm, refundEnabled: !instanceForm.refundEnabled })}
+                        onChange={() =>
+                          setInstanceForm({ ...instanceForm, refundEnabled: !instanceForm.refundEnabled })
+                        }
                       />
                       <span className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         {t.instanceRefundEnabled}
