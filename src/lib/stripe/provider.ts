@@ -1,5 +1,4 @@
 import Stripe from 'stripe';
-import { Prisma } from '@prisma/client';
 import { getEnv } from '@/lib/config';
 import type {
   PaymentProvider,
@@ -33,7 +32,7 @@ export class StripeProvider implements PaymentProvider {
   async createPayment(request: CreatePaymentRequest): Promise<CreatePaymentResponse> {
     const stripe = this.getClient();
 
-    const amountInCents = Math.round(new Prisma.Decimal(request.amount).mul(100).toNumber());
+    const amountInCents = Math.round(request.amount * 100);
 
     const pi = await stripe.paymentIntents.create(
       {
@@ -63,7 +62,7 @@ export class StripeProvider implements PaymentProvider {
     return {
       tradeNo: pi.id,
       status,
-      amount: new Prisma.Decimal(pi.amount).div(100).toNumber(),
+      amount: pi.amount / 100,
     };
   }
 
@@ -87,7 +86,7 @@ export class StripeProvider implements PaymentProvider {
       return {
         tradeNo: pi.id,
         orderId: pi.metadata?.orderId || '',
-        amount: new Prisma.Decimal(pi.amount).div(100).toNumber(),
+        amount: pi.amount / 100,
         status: 'success',
         rawData: event,
       };
@@ -98,7 +97,7 @@ export class StripeProvider implements PaymentProvider {
       return {
         tradeNo: pi.id,
         orderId: pi.metadata?.orderId || '',
-        amount: new Prisma.Decimal(pi.amount).div(100).toNumber(),
+        amount: pi.amount / 100,
         status: 'failed',
         rawData: event,
       };
@@ -114,7 +113,7 @@ export class StripeProvider implements PaymentProvider {
     // tradeNo is now the PaymentIntent ID directly
     const refund = await stripe.refunds.create({
       payment_intent: request.tradeNo,
-      amount: Math.round(new Prisma.Decimal(request.amount).mul(100).toNumber()),
+      amount: Math.round(request.amount * 100),
       reason: 'requested_by_customer',
     });
 

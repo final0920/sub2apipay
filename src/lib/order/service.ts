@@ -16,7 +16,6 @@ import {
   extendSubscription,
 } from '@/lib/sub2api/client';
 import { computeValidityDays, type ValidityUnit } from '@/lib/subscription-utils';
-import { Prisma } from '@prisma/client';
 import { deriveOrderState, isRefundStatus } from './status';
 import { pickLocaleText, type Locale } from '@/lib/locale';
 import { getBizDayStartUTC } from '@/lib/time/biz-day';
@@ -72,7 +71,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   let subscriptionPlan: {
     id: string;
     groupId: number | null;
-    price: Prisma.Decimal;
+    price: number | { toString(): string };
     validityDays: number;
     validityUnit: string;
     name: string;
@@ -257,7 +256,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
     : env.MAX_DAILY_RECHARGE_AMOUNT;
 
   // 将限额校验与订单创建放在同一个 serializable 事务中，防止并发突破限额
-  const order = await prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx: any) => {
     // 待支付订单数限制
     const pendingCount = await tx.order.count({
       where: { userId: input.userId, status: ORDER_STATUS.PENDING },
@@ -337,9 +336,9 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
         userEmail: user.email,
         userName: user.username,
         userNotes: user.notes || null,
-        amount: new Prisma.Decimal(input.amount.toFixed(2)),
-        payAmount: new Prisma.Decimal(payAmountStr),
-        feeRate: feeRate > 0 ? new Prisma.Decimal(feeRate.toFixed(4)) : null,
+        amount: input.amount.toFixed(2),
+        payAmount: payAmountStr,
+        feeRate: feeRate > 0 ? feeRate.toFixed(4) : null,
         rechargeCode: '',
         status: 'PENDING',
         paymentType: input.paymentType,
@@ -661,30 +660,28 @@ export async function confirmPayment(input: {
     return false;
   }
 
-  let paidAmount: Prisma.Decimal;
-  try {
-    paidAmount = new Prisma.Decimal(input.paidAmount.toFixed(2));
-  } catch {
+  const paidAmount = Number(input.paidAmount.toFixed(2));
+  if (!Number.isFinite(paidAmount)) {
     console.error(`${input.providerName} notify: invalid amount:`, input.paidAmount);
     return false;
   }
-  if (paidAmount.lte(0)) {
+  if (paidAmount <= 0) {
     console.error(`${input.providerName} notify: non-positive amount:`, input.paidAmount);
     return false;
   }
-  const expectedAmount = order.payAmount ?? order.amount;
-  if (!paidAmount.equals(expectedAmount)) {
-    const diff = paidAmount.minus(expectedAmount).abs();
-    if (diff.gt(new Prisma.Decimal('0.01'))) {
+  const expectedAmount = Number(order.payAmount ?? order.amount);
+  if (paidAmount !== expectedAmount) {
+    const diff = Math.abs(paidAmount - expectedAmount);
+    if (diff > 0.01) {
       // 写审计日志
       await prisma.auditLog.create({
         data: {
           orderId: order.id,
           action: 'PAYMENT_AMOUNT_MISMATCH',
           detail: JSON.stringify({
-            expected: expectedAmount.toString(),
-            paid: paidAmount.toString(),
-            diff: diff.toString(),
+            expected: expectedAmount.toFixed(2),
+            paid: paidAmount.toFixed(2),
+            diff: diff.toFixed(2),
             tradeNo: input.tradeNo,
           }),
           operator: input.providerName,
@@ -849,7 +846,7 @@ export async function executeSubscriptionFulfillment(orderId: string): Promise<v
     let renewedSubscriptionId: number | undefined;
 
     const userSubs = await getUserSubscriptions(order.userId);
-    const activeSub = userSubs.find((s) => s.group_id === order.subscriptionGroupId && s.status === 'active');
+    const activeSub = userSubs.find((s: any) => s.group_id === order.subscriptionGroupId && s.status === 'active');
 
     if (activeSub) {
       // 续费：从到期日往后推算天数（使用订单关联的具体套餐，而非分组下任意套餐）
@@ -1161,7 +1158,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
       if (order.subscriptionGroupId && order.subscriptionDays) {
         try {
           const userSubs = await getUserSubscriptions(order.userId);
-          const activeSub = userSubs.find((s) => s.group_id === order.subscriptionGroupId && s.status === 'active');
+          const activeSub = userSubs.find((s: any) => s.group_id === order.subscriptionGroupId && s.status === 'active');
           if (activeSub) {
             const remainingDays = Math.max(
               0,
@@ -1371,7 +1368,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
       where: { id: input.orderId },
       data: {
         status: ORDER_STATUS.REFUNDED,
-        refundAmount: new Prisma.Decimal(refundAmount.toFixed(2)),
+        refundAmount: refundAmount.toFixed(2),
         refundReason: input.reason || null,
         refundAt: new Date(),
         forceRefund: input.force || false,

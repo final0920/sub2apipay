@@ -1,8 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { getEnv } from '@/lib/config';
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const { PrismaClient } = require('@prisma/client') as { PrismaClient: new (options?: unknown) => any };
+
+const globalForPrisma = globalThis as unknown as { prisma: any };
 
 function createPrismaClient() {
   const connectionString = getEnv().DATABASE_URL;

@@ -283,8 +283,8 @@ function renderCompatibilityPage(orderId: string): NextResponse {
 
 type RouteOrder = {
   id: string;
-  amount: number;
-  payAmount: number | null;
+  amount: number | { toString(): string };
+  payAmount: number | { toString(): string } | null;
   paymentType: string;
   status: string;
   expiresAt: Date;

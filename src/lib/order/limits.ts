@@ -119,20 +119,20 @@ async function aggregateInstanceLimits(paymentTypes: string[]): Promise<
   const usageRows = await prisma.order.groupBy({
     by: ['providerInstanceId'],
     where: {
-      providerInstanceId: { in: allInstances.map((i) => i.id) },
+      providerInstanceId: { in: allInstances.map((i: any) => i.id) },
       status: { in: [ORDER_STATUS.PAID, ORDER_STATUS.RECHARGING, ORDER_STATUS.COMPLETED] },
       paidAt: { gte: todayStart },
     },
     _sum: { payAmount: true },
   });
-  const usageMap = new Map(usageRows.map((r) => [r.providerInstanceId, Number(r._sum.payAmount ?? 0)]));
+  const usageMap = new Map(usageRows.map((r: any) => [r.providerInstanceId, Number(r._sum.payAmount ?? 0)]));
 
   for (const type of paymentTypes) {
-    const supporting = allInstances.filter((inst) => {
+    const supporting = allInstances.filter((inst: any) => {
       if (!inst.supportedTypes) return true;
       const types = inst.supportedTypes
         .split(',')
-        .map((s) => s.trim())
+        .map((s: any) => s.trim())
         .filter(Boolean);
       return types.length === 0 || types.includes(type);
     });
@@ -165,21 +165,21 @@ async function aggregateInstanceLimits(paymentTypes: string[]): Promise<
       }
 
       // 单笔范围：取所有实例中最宽松的范围
-      const instMin = channelLimits?.singleMin ?? 0;
-      const instMax = channelLimits?.singleMax ?? 0;
+      const instMin = Number(channelLimits?.singleMin ?? 0);
+      const instMax = Number(channelLimits?.singleMax ?? 0);
       if (instMin > 0 && instMin < aggSingleMin) aggSingleMin = instMin;
       if (instMin === 0) aggSingleMin = 0;
       if (instMax > aggSingleMax) aggSingleMax = instMax;
       if (instMax === 0) aggSingleMax = 0;
 
       // 日限额：计算剩余容量，判断是否可用
-      const instDailyLimit = channelLimits?.dailyLimit;
+      const instDailyLimit = Number(channelLimits?.dailyLimit ?? 0);
       if (!instDailyLimit || instDailyLimit <= 0) {
         // 无日限额限制
         allBlocked = false;
         maxRemaining = null; // null 表示至少有一个实例无限额
       } else {
-        const used = usageMap.get(inst.id) ?? 0;
+        const used = Number(usageMap.get(inst.id) ?? 0);
         const remaining = Math.max(0, instDailyLimit - used);
         const effectiveMin = instMin > 0 ? instMin : 0;
 
@@ -229,7 +229,7 @@ export async function queryMethodLimits(paymentTypes: string[]): Promise<Record<
     aggregateInstanceLimits(paymentTypes),
   ]);
 
-  const usageMap = Object.fromEntries(usageRows.map((row) => [row.paymentType, Number(row._sum.amount ?? 0)]));
+  const usageMap = Object.fromEntries(usageRows.map((row: any) => [row.paymentType, Number(row._sum.amount ?? 0)]));
 
   const result: Record<string, MethodLimitStatus> = {};
   for (const type of paymentTypes) {

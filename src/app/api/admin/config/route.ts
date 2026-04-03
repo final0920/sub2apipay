@@ -31,7 +31,7 @@ async function findBlockedProviders(removedProviders: string[]): Promise<string[
     where: { providerKey: { in: removedProviders } },
     _count: true,
   });
-  return groups.filter((g) => g._count > 0).map((g) => g.providerKey);
+  return groups.filter((g: any) => g._count > 0).map((g: any) => g.providerKey);
 }
 
 /**

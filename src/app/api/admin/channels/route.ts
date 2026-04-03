@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     // 并发检查每个渠道对应的 Sub2API 分组是否仍然存在
     const results = await Promise.all(
-      channels.map(async (channel) => {
+      channels.map(async (channel: any) => {
         let groupExists = false;
         if (channel.groupId !== null) {
           try {

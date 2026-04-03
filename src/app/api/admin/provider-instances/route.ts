@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     });
 
-    const result = instances.map((inst) => ({
+    const result = instances.map((inst: any) => ({
       ...inst,
       config: decryptAndMaskConfig(inst.config),
       limits: inst.limits ? JSON.parse(inst.limits) : null,

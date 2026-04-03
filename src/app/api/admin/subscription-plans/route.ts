@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     // 并发检查每个套餐对应的 Sub2API 分组是否仍然存在，并获取分组名称
     const results = await Promise.all(
-      plans.map(async (plan) => {
+      plans.map(async (plan: any) => {
         let groupExists = false;
         let groupName: string | null = null;
         let group: Awaited<ReturnType<typeof getGroup>> | null = null;
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
                 where: { id: plan.id },
                 data: { groupId: null, forSale: false },
               })
-              .catch((err) => console.error(`Failed to unbind stale group for plan ${plan.id}:`, err));
+              .catch((err: any) => console.error(`Failed to unbind stale group for plan ${plan.id}:`, err));
           }
         }
 

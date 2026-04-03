@@ -123,5 +123,9 @@ export async function precreateExecute(
   bizContent: AlipayTradePrecreateBizContent,
   options?: { notifyUrl?: string },
 ): Promise<AlipayTradePrecreateResponse> {
-  return execute<AlipayTradePrecreateResponse>('alipay.trade.precreate', bizContent, options);
+  return execute<AlipayTradePrecreateResponse>(
+    'alipay.trade.precreate',
+    bizContent as unknown as Record<string, unknown>,
+    options,
+  );
 }

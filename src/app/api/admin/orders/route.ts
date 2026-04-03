@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verifyAdminToken, unauthorizedResponse } from '@/lib/admin-auth';
-import { Prisma, OrderStatus } from '@prisma/client';
+
+const VALID_ORDER_STATUSES = [
+  'PENDING',
+  'PAID',
+  'RECHARGING',
+  'COMPLETED',
+  'EXPIRED',
+  'CANCELLED',
+  'FAILED',
+  'REFUNDING',
+  'REFUNDED',
+  'REFUND_FAILED',
+];
 
 export async function GET(request: NextRequest) {
   if (!(await verifyAdminToken(request))) return unauthorizedResponse();
@@ -15,11 +27,10 @@ export async function GET(request: NextRequest) {
   const dateFrom = searchParams.get('date_from');
   const dateTo = searchParams.get('date_to');
 
-  const where: Prisma.OrderWhereInput = {};
-  if (status && status in OrderStatus) where.status = status as OrderStatus;
+  const where: Record<string, any> = {};
+  if (status && VALID_ORDER_STATUSES.includes(status)) where.status = status;
   if (orderType && (orderType === 'balance' || orderType === 'subscription')) where.orderType = orderType;
 
-  // userId 校验：忽略无效值（NaN）
   if (userId) {
     const parsedUserId = Number(userId);
     if (Number.isFinite(parsedUserId)) {
@@ -27,9 +38,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 日期校验：忽略无效日期
   if (dateFrom || dateTo) {
-    const createdAt: Prisma.DateTimeFilter = {};
+    const createdAt: Record<string, Date> = {};
     let hasValidDate = false;
 
     if (dateFrom) {
@@ -86,11 +96,11 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    orders: orders.map((o) => ({
-      ...o,
-      amount: Number(o.amount),
-      payAmount: o.payAmount ? Number(o.payAmount) : null,
-      refundAmount: o.refundAmount ? Number(o.refundAmount) : null,
+    orders: orders.map((order: any) => ({
+      ...order,
+      amount: Number(order.amount),
+      payAmount: order.payAmount ? Number(order.payAmount) : null,
+      refundAmount: order.refundAmount ? Number(order.refundAmount) : null,
     })),
     total,
     page,

@@ -37,7 +37,7 @@ async function filterByDailyLimits(
 
   for (const inst of instances) {
     const limits = parseInstanceLimits(inst.limits);
-    const channelLimit = limits?.[paymentType]?.dailyLimit;
+    const channelLimit = Number(limits?.[paymentType]?.dailyLimit ?? 0);
     if (channelLimit && channelLimit > 0) {
       needCheck.push(inst.id);
     }
@@ -55,14 +55,14 @@ async function filterByDailyLimits(
     _sum: { payAmount: true },
   });
 
-  const usageMap = new Map(amounts.map((a) => [a.providerInstanceId, Number(a._sum.payAmount ?? 0)]));
+  const usageMap = new Map(amounts.map((a: any) => [a.providerInstanceId, Number(a._sum.payAmount ?? 0)]));
   const blocked = new Set<string>();
 
   for (const inst of instances) {
     const limits = parseInstanceLimits(inst.limits);
-    const channelLimit = limits?.[paymentType]?.dailyLimit;
+    const channelLimit = Number(limits?.[paymentType]?.dailyLimit ?? 0);
     if (channelLimit && channelLimit > 0) {
-      const used = usageMap.get(inst.id) ?? 0;
+      const used = Number(usageMap.get(inst.id) ?? 0);
       if (used >= channelLimit) {
         blocked.add(inst.id);
       }
@@ -90,11 +90,11 @@ export async function selectInstance(
 
   // Filter by supportedTypes if paymentType is specified
   let instances = paymentType
-    ? allInstances.filter((inst) => {
+    ? allInstances.filter((inst: any) => {
         if (!inst.supportedTypes) return true; // empty = supports all
         const types = inst.supportedTypes
           .split(',')
-          .map((s) => s.trim())
+          .map((s: any) => s.trim())
           .filter(Boolean);
         return types.length === 0 || types.includes(paymentType);
       })
@@ -104,13 +104,13 @@ export async function selectInstance(
   if (paymentType && instances.length > 0) {
     const blocked = await filterByDailyLimits(instances, paymentType);
     if (blocked.size > 0) {
-      instances = instances.filter((inst) => !blocked.has(inst.id));
+      instances = instances.filter((inst: any) => !blocked.has(inst.id));
     }
   }
 
   // Filter by per-instance single amount limits (singleMin / singleMax)
   if (paymentType && amount !== undefined && instances.length > 0) {
-    instances = instances.filter((inst) => {
+    instances = instances.filter((inst: any) => {
       const limits = parseInstanceLimits(inst.limits);
       const channelLimits = limits?.[paymentType];
       if (!channelLimits) return true;
@@ -126,7 +126,7 @@ export async function selectInstance(
     // Pick the instance with the least paid amount today
     const todayStart = getBizDayStartUTC();
     const amounts = await Promise.all(
-      instances.map(async (inst) => {
+      instances.map(async (inst: any) => {
         const agg = await prisma.order.aggregate({
           where: {
             providerInstanceId: inst.id,
@@ -138,7 +138,7 @@ export async function selectInstance(
         return { instance: inst, amount: Number(agg._sum.payAmount ?? 0) };
       }),
     );
-    amounts.sort((a, b) => a.amount - b.amount);
+    amounts.sort((a: any, b: any) => a.amount - b.amount);
     const selected = amounts[0].instance;
     return { instanceId: selected.id, config: JSON.parse(decrypt(selected.config)) };
   }

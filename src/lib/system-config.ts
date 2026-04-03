@@ -62,10 +62,10 @@ export async function getSystemConfigs(keys: string[]): Promise<Record<string, s
       where: { key: { in: missing } },
     });
 
-    const dbMap = new Map(rows.map((r) => [r.key, r.value]));
+    const dbMap = new Map(rows.map((r: any) => [r.key, r.value]));
 
     for (const key of missing) {
-      const val = dbMap.get(key) ?? process.env[key];
+      const val = (dbMap.get(key) ?? process.env[key]) as string | undefined;
       if (val !== undefined) {
         result[key] = val;
         setCache(key, val);

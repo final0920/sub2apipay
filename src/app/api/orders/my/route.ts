@@ -50,10 +50,10 @@ export async function GET(request: NextRequest) {
       prisma.order.groupBy({ by: ['status'], where, _count: true }),
     ]);
 
-    const sc = Object.fromEntries(statusGroups.map((g) => [g.status, g._count]));
+    const sc = Object.fromEntries(statusGroups.map((g: any) => [g.status, g._count]));
 
     // 批量查询订单关联实例的退款开关
-    const instanceIds = [...new Set(orders.map((o) => o.providerInstanceId).filter(Boolean))] as string[];
+    const instanceIds = [...new Set(orders.map((o: any) => o.providerInstanceId).filter(Boolean))] as string[];
     const refundEnabledMap = new Map<string, boolean>();
     if (instanceIds.length > 0) {
       const instances = await prisma.paymentProviderInstance.findMany({
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         displayName: user.username || user.email || `User #${user.id}`,
         balance: user.balance,
       },
-      orders: orders.map((item) => {
+      orders: orders.map((item: any) => {
         const derived = deriveOrderState(item);
         const instanceRefundEnabled = item.providerInstanceId
           ? (refundEnabledMap.get(item.providerInstanceId) ?? false)
