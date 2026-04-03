@@ -1,6 +1,6 @@
 import { getEnv } from '@/lib/config';
 import { generateSign, verifyResponseSign } from './sign';
-import type { AlipayResponse } from './types';
+import type { AlipayResponse, AlipayTradePrecreateBizContent, AlipayTradePrecreateResponse } from './types';
 import { parseAlipayJsonResponseWithRaw } from './codec';
 
 const GATEWAY = 'https://openapi.alipay.com/gateway.do';
@@ -114,4 +114,14 @@ export async function execute<T extends AlipayResponse>(
   }
 
   return result;
+}
+
+/**
+ * 调用支付宝当面付预下单接口，返回官方二维码内容。
+ */
+export async function precreateExecute(
+  bizContent: AlipayTradePrecreateBizContent,
+  options?: { notifyUrl?: string },
+): Promise<AlipayTradePrecreateResponse> {
+  return execute<AlipayTradePrecreateResponse>('alipay.trade.precreate', bizContent, options);
 }

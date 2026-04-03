@@ -18,7 +18,7 @@ vi.mock('@/lib/alipay/sign', () => ({
   verifyResponseSign: vi.fn(() => true),
 }));
 
-import { execute, pageExecute } from '@/lib/alipay/client';
+import { execute, pageExecute, precreateExecute } from '@/lib/alipay/client';
 
 describe('alipay client helpers', () => {
   beforeEach(() => {
@@ -94,5 +94,33 @@ describe('alipay client helpers', () => {
     await expect(execute('alipay.trade.query', { out_trade_no: 'order-004' })).rejects.toThrow(
       '[ACQ.TRADE_NOT_EXIST] trade not exist',
     );
+  });
+
+  it('precreateExecute posts alipay.trade.precreate and returns qr_code payload', async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          alipay_trade_precreate_response: {
+            code: '10000',
+            msg: 'Success',
+            out_trade_no: 'order-precreate-001',
+            qr_code: 'https://qr.alipay.com/fkx-precreate',
+          },
+          sign: 'server-sign',
+        }),
+        { headers: { 'content-type': 'application/json; charset=utf-8' } },
+      ),
+    ) as typeof fetch;
+
+    const result = await precreateExecute({
+      out_trade_no: 'order-precreate-001',
+      total_amount: '10.00',
+      subject: 'Face to face order',
+    });
+
+    expect(result.qr_code).toBe('https://qr.alipay.com/fkx-precreate');
+    const [url, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe('https://openapi.alipay.com/gateway.do');
+    expect(String(init.body)).toContain('method=alipay.trade.precreate');
   });
 });

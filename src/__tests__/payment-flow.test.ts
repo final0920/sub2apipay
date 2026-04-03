@@ -21,8 +21,10 @@ vi.mock('@/lib/easy-pay/sign', () => ({
 // ============================================================
 
 const mockAlipayPageExecute = vi.fn();
+const mockAlipayPrecreateExecute = vi.fn();
 vi.mock('@/lib/alipay/client', () => ({
   pageExecute: (...args: unknown[]) => mockAlipayPageExecute(...args),
+  precreateExecute: (...args: unknown[]) => mockAlipayPrecreateExecute(...args),
   execute: vi.fn(),
 }));
 
@@ -235,7 +237,14 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
       provider = new AlipayProvider();
     });
 
-    it('PC: returns service short-link payUrl and qrCode', async () => {
+    it('PC: returns official Alipay qrCode directly', async () => {
+      mockAlipayPrecreateExecute.mockResolvedValue({
+        code: '10000',
+        msg: 'Success',
+        out_trade_no: 'order-ali-001',
+        qr_code: 'https://qr.alipay.com/fkx-order-ali-001',
+      });
+
       const request: CreatePaymentRequest = {
         orderId: 'order-ali-001',
         amount: 100,
@@ -247,9 +256,19 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
       const result = await provider.createPayment(request);
 
       expect(result.tradeNo).toBe('order-ali-001');
-      expect(result.payUrl).toBe('https://pay.example.com/pay/order-ali-001');
-      expect(result.qrCode).toBe('https://pay.example.com/pay/order-ali-001');
+      expect(result.payUrl).toBeUndefined();
+      expect(result.qrCode).toBe('https://qr.alipay.com/fkx-order-ali-001');
       expect(mockAlipayPageExecute).not.toHaveBeenCalled();
+      expect(mockAlipayPrecreateExecute).toHaveBeenCalledWith(
+        {
+          out_trade_no: 'order-ali-001',
+          total_amount: '100.00',
+          subject: 'Test Recharge',
+        },
+        {
+          notifyUrl: undefined,
+        },
+      );
 
       expect(
         shouldAutoRedirect({
@@ -262,10 +281,13 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
       ).toBe(false);
     });
 
-    it('Mobile: uses alipay.trade.wap.pay, returns payUrl', async () => {
-      mockAlipayPageExecute.mockReturnValue(
-        'https://openapi.alipay.com/gateway.do?method=alipay.trade.wap.pay&sign=yyy',
-      );
+    it('Mobile: still returns official Alipay qrCode instead of wap redirect', async () => {
+      mockAlipayPrecreateExecute.mockResolvedValue({
+        code: '10000',
+        msg: 'Success',
+        out_trade_no: 'order-ali-002',
+        qr_code: 'https://qr.alipay.com/fkx-order-ali-002',
+      });
 
       const request: CreatePaymentRequest = {
         orderId: 'order-ali-002',
@@ -278,20 +300,21 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
       const result = await provider.createPayment(request);
 
       expect(result.tradeNo).toBe('order-ali-002');
-      expect(result.payUrl).toContain('alipay.trade.wap.pay');
-      expect(result.qrCode).toBeUndefined();
+      expect(result.payUrl).toBeUndefined();
+      expect(result.qrCode).toBe('https://qr.alipay.com/fkx-order-ali-002');
 
-      // Verify pageExecute was called with H5 method
-      expect(mockAlipayPageExecute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          product_code: 'QUICK_WAP_WAY',
-        }),
-        expect.objectContaining({
-          method: 'alipay.trade.wap.pay',
-        }),
+      expect(mockAlipayPrecreateExecute).toHaveBeenCalledWith(
+        {
+          out_trade_no: 'order-ali-002',
+          total_amount: '50.00',
+          subject: 'Test Recharge',
+        },
+        {
+          notifyUrl: undefined,
+        },
       );
+      expect(mockAlipayPageExecute).not.toHaveBeenCalled();
 
-      // Mobile + payUrl => shouldAutoRedirect = true
       expect(
         shouldAutoRedirect({
           expired: false,
@@ -300,12 +323,12 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
           qrCode: result.qrCode,
           isMobile: true,
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
 
-    it('Mobile: surfaces wap.pay creation errors', async () => {
-      mockAlipayPageExecute.mockImplementationOnce(() => {
-        throw new Error('WAP pay not available');
+    it('surfaces precreate creation errors', async () => {
+      mockAlipayPrecreateExecute.mockImplementationOnce(() => {
+        throw new Error('Precreate not available');
       });
 
       const request: CreatePaymentRequest = {
@@ -316,16 +339,12 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
         isMobile: true,
       };
 
-      await expect(provider.createPayment(request)).rejects.toThrow('WAP pay not available');
-      expect(mockAlipayPageExecute).toHaveBeenCalledTimes(1);
-      expect(mockAlipayPageExecute).toHaveBeenCalledWith(
-        expect.objectContaining({ product_code: 'QUICK_WAP_WAY' }),
-        expect.objectContaining({ method: 'alipay.trade.wap.pay' }),
-      );
+      await expect(provider.createPayment(request)).rejects.toThrow('Precreate not available');
+      expect(mockAlipayPrecreateExecute).toHaveBeenCalledTimes(1);
     });
 
     it('alipay_direct is in REDIRECT_PAYMENT_TYPES', () => {
-      expect(REDIRECT_PAYMENT_TYPES.has('alipay_direct')).toBe(true);
+      expect(REDIRECT_PAYMENT_TYPES.has('alipay_direct')).toBe(false);
     });
   });
 
@@ -696,8 +715,8 @@ describe('Payment Flow - PC/Mobile, QR/Redirect', () => {
   });
 
   describe('REDIRECT_PAYMENT_TYPES', () => {
-    it('includes alipay_direct', () => {
-      expect(REDIRECT_PAYMENT_TYPES.has('alipay_direct')).toBe(true);
+    it('does not include alipay_direct after face-to-face refactor', () => {
+      expect(REDIRECT_PAYMENT_TYPES.has('alipay_direct')).toBe(false);
     });
 
     it('does not include alipay (easypay version)', () => {

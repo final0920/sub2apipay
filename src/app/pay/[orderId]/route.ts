@@ -43,6 +43,20 @@ function buildResultUrl(orderId: string): string {
   return buildOrderResultUrl(getEnv().NEXT_PUBLIC_APP_URL, orderId);
 }
 
+function buildShortLinkPath(orderId: string): string {
+  return `/pay/${orderId}`;
+}
+
+function isInternalOrderUrl(candidate: string | null | undefined, orderId: string): boolean {
+  if (!candidate) return false;
+  try {
+    const url = new URL(candidate, getEnv().NEXT_PUBLIC_APP_URL);
+    return url.pathname === buildShortLinkPath(orderId);
+  } catch {
+    return false;
+  }
+}
+
 function serializeScriptString(value: string): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
@@ -216,7 +230,7 @@ function renderStatusPage(order: ShortLinkOrderStatus): NextResponse {
 
 function renderRedirectPage(orderId: string, payUrl: string): NextResponse {
   const html = renderHtml(
-    '正在跳转支付宝',
+    '正在拉起支付宝',
     `<main class="card">
       <div class="icon">支</div>
       <h1>正在拉起支付宝</h1>
@@ -246,6 +260,77 @@ function renderRedirectPage(orderId: string, payUrl: string): NextResponse {
   });
 }
 
+function renderCompatibilityPage(orderId: string): NextResponse {
+  const html = renderHtml(
+    '请返回支付页继续支付',
+    `<main class="card">
+      <div class="icon">支</div>
+      <h1>请返回原支付页继续支付</h1>
+      <p>该订单当前使用支付宝当面付二维码支付，请返回原充值页面扫描二维码完成支付。</p>
+      <div class="order">订单号：${escapeHtml(orderId)}</div>
+      <a class="button secondary" href="${escapeHtml(buildResultUrl(orderId))}">查看订单结果</a>
+      <a class="text-link" href="${escapeHtml(buildAppUrl('/pay/orders'))}">查看我的订单</a>
+    </main>`,
+  );
+
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+    },
+  });
+}
+
+type RouteOrder = {
+  id: string;
+  amount: number;
+  payAmount: number | null;
+  paymentType: string;
+  status: string;
+  expiresAt: Date;
+  paidAt: Date | null;
+  completedAt: Date | null;
+  orderType: string;
+  payUrl: string | null;
+  qrCode: string | null;
+  plan: { productName: string | null; name: string } | null;
+};
+
+function isLegacyShortLinkOrder(order: RouteOrder): boolean {
+  return (
+    isInternalOrderUrl(order.payUrl, order.id) ||
+    isInternalOrderUrl(order.qrCode, order.id)
+  );
+}
+
+async function buildLegacyPayUrl(request: NextRequest, order: RouteOrder): Promise<string> {
+  const payAmount = Number(order.payAmount ?? order.amount);
+  let subject: string;
+
+  if (order.orderType === 'subscription' && order.plan) {
+    subject = order.plan.productName || `Sub2API 订阅 ${order.plan.name}`;
+  } else {
+    const nameConfigs = await getSystemConfigs(['PRODUCT_NAME_PREFIX', 'PRODUCT_NAME_SUFFIX']);
+    const prefix = nameConfigs.PRODUCT_NAME_PREFIX?.trim();
+    const suffix = nameConfigs.PRODUCT_NAME_SUFFIX?.trim();
+    if (prefix || suffix) {
+      subject = `${prefix || ''} ${payAmount.toFixed(2)} ${suffix || ''}`.trim();
+    } else {
+      subject = `Sub2API ${payAmount.toFixed(2)} CNY`;
+    }
+  }
+
+  const env = getEnv();
+  return buildAlipayPaymentUrl({
+    orderId: order.id,
+    amount: payAmount,
+    subject,
+    notifyUrl: env.ALIPAY_NOTIFY_URL,
+    returnUrl: isAlipayAppRequest(request) ? null : buildResultUrl(order.id),
+    isMobile: isMobileRequest(request),
+  });
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
 
@@ -261,13 +346,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       paidAt: true,
       completedAt: true,
       orderType: true,
+      payUrl: true,
+      qrCode: true,
       plan: { select: { productName: true, name: true } },
-      subscriptionGroupId: true,
     },
   });
 
   if (!order) {
-    return renderErrorPage('订单不存在', '未找到对应订单，请确认二维码是否正确', orderId, 404);
+    return renderErrorPage('订单不存在', '未找到对应订单，请确认链接是否正确', orderId, 404);
   }
 
   if (order.paymentType !== 'alipay_direct') {
@@ -292,30 +378,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return renderErrorPage('订单金额异常', '订单金额无效，请返回原页面重新发起支付', order.id, 500);
   }
 
-  // 构建支付商品名称（与 order/service.ts 逻辑保持一致）
-  let subject: string;
-  if (order.orderType === 'subscription' && order.plan) {
-    subject = order.plan.productName || `Sub2API 订阅 ${order.plan.name}`;
-  } else {
-    const nameConfigs = await getSystemConfigs(['PRODUCT_NAME_PREFIX', 'PRODUCT_NAME_SUFFIX']);
-    const prefix = nameConfigs['PRODUCT_NAME_PREFIX']?.trim();
-    const suffix = nameConfigs['PRODUCT_NAME_SUFFIX']?.trim();
-    if (prefix || suffix) {
-      subject = `${prefix || ''} ${payAmount.toFixed(2)} ${suffix || ''}`.trim();
-    } else {
-      subject = `Sub2API ${payAmount.toFixed(2)} CNY`;
-    }
+  if (!isLegacyShortLinkOrder(order)) {
+    return renderCompatibilityPage(order.id);
   }
 
-  const env = getEnv();
-  const payUrl = buildAlipayPaymentUrl({
-    orderId: order.id,
-    amount: payAmount,
-    subject,
-    notifyUrl: env.ALIPAY_NOTIFY_URL,
-    returnUrl: isAlipayAppRequest(request) ? null : buildResultUrl(order.id),
-    isMobile: isMobileRequest(request),
-  });
-
+  const payUrl = await buildLegacyPayUrl(request, order);
   return renderRedirectPage(order.id, payUrl);
 }

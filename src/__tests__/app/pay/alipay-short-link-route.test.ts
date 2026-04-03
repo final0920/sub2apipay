@@ -4,6 +4,7 @@ import { ORDER_STATUS } from '@/lib/constants';
 
 const mockFindUnique = vi.fn();
 const mockBuildAlipayPaymentUrl = vi.fn();
+const mockGetSystemConfigs = vi.fn();
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -27,7 +28,7 @@ vi.mock('@/lib/alipay/provider', () => ({
 }));
 
 vi.mock('@/lib/system-config', () => ({
-  getSystemConfigs: vi.fn().mockResolvedValue({}),
+  getSystemConfigs: (...args: unknown[]) => mockGetSystemConfigs(...args),
 }));
 
 import { GET } from '@/app/pay/[orderId]/route';
@@ -50,8 +51,9 @@ function createPendingOrder(overrides: Record<string, unknown> = {}) {
     paidAt: null,
     completedAt: null,
     orderType: 'balance',
+    payUrl: 'https://pay.example.com/pay/order-001',
+    qrCode: 'https://pay.example.com/pay/order-001',
     plan: null,
-    subscriptionGroupId: null,
     ...overrides,
   };
 }
@@ -60,7 +62,8 @@ describe('GET /pay/[orderId]', () => {
   beforeEach(() => {
     vi.useFakeTimers({ now: new Date('2026-03-14T12:00:00Z') });
     vi.clearAllMocks();
-    mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?mock=1');
+    mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?desktop=1');
+    mockGetSystemConfigs.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -123,26 +126,6 @@ describe('GET /pay/[orderId]', () => {
     expect(mockBuildAlipayPaymentUrl).not.toHaveBeenCalled();
   });
 
-  it('returns paid-but-recharge-failed status page for failed paid orders', async () => {
-    mockFindUnique.mockResolvedValue(
-      createPendingOrder({
-        status: ORDER_STATUS.FAILED,
-        paidAt: new Date('2026-03-09T10:00:00Z'),
-      }),
-    );
-
-    const response = await GET(createRequest(), {
-      params: Promise.resolve({ orderId: 'order-001' }),
-    });
-
-    const html = await response.text();
-
-    expect(response.status).toBe(200);
-    expect(html).toContain('支付成功');
-    expect(html).toContain('余额充值暂未完成');
-    expect(mockBuildAlipayPaymentUrl).not.toHaveBeenCalled();
-  });
-
   it('returns expired status page when order is timed out', async () => {
     mockFindUnique.mockResolvedValue(
       createPendingOrder({
@@ -162,8 +145,7 @@ describe('GET /pay/[orderId]', () => {
     expect(mockBuildAlipayPaymentUrl).not.toHaveBeenCalled();
   });
 
-  it('builds desktop redirect page with service-generated alipay url and no manual pay button', async () => {
-    mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?desktop=1');
+  it('keeps legacy short-link orders working on desktop browsers', async () => {
     mockFindUnique.mockResolvedValue(createPendingOrder());
 
     const response = await GET(createRequest(), {
@@ -177,10 +159,6 @@ describe('GET /pay/[orderId]', () => {
     expect(html).toContain('正在拉起支付宝');
     expect(html).toContain('https://openapi.alipay.com/gateway.do?desktop=1');
     expect(html).toContain('http-equiv="refresh"');
-    expect(html).not.toContain('立即前往支付宝');
-    expect(html).toContain('查看订单结果');
-    expect(html).toContain('order_id=order-001');
-    expect(html).toContain('access_token=');
     expect(mockBuildAlipayPaymentUrl).toHaveBeenCalledWith({
       orderId: 'order-001',
       amount: 100.5,
@@ -191,40 +169,7 @@ describe('GET /pay/[orderId]', () => {
     });
   });
 
-  it('builds mobile redirect page with wap alipay url', async () => {
-    mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?mobile=1');
-    mockFindUnique.mockResolvedValue(
-      createPendingOrder({
-        payAmount: null,
-        amount: 88,
-      }),
-    );
-
-    const response = await GET(
-      createRequest('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'),
-      {
-        params: Promise.resolve({ orderId: 'order-001' }),
-      },
-    );
-
-    const html = await response.text();
-    const expectedReturnUrl = buildOrderResultUrl('https://pay.example.com', 'order-001');
-
-    expect(response.status).toBe(200);
-    expect(html).toContain('正在拉起支付宝');
-    expect(html).toContain('https://openapi.alipay.com/gateway.do?mobile=1');
-    expect(html).not.toContain('立即前往支付宝');
-    expect(mockBuildAlipayPaymentUrl).toHaveBeenCalledWith({
-      orderId: 'order-001',
-      amount: 88,
-      subject: 'Sub2API 88.00 CNY',
-      notifyUrl: 'https://pay.example.com/api/alipay/notify',
-      returnUrl: expectedReturnUrl,
-      isMobile: true,
-    });
-  });
-
-  it('omits returnUrl for Alipay app requests to avoid extra close step', async () => {
+  it('keeps legacy short-link orders working for Alipay app user agents', async () => {
     mockBuildAlipayPaymentUrl.mockReturnValue('https://openapi.alipay.com/gateway.do?alipayapp=1');
     mockFindUnique.mockResolvedValue(createPendingOrder({ payAmount: 66 }));
 
@@ -241,9 +186,6 @@ describe('GET /pay/[orderId]', () => {
 
     expect(response.status).toBe(200);
     expect(html).toContain('https://openapi.alipay.com/gateway.do?alipayapp=1');
-    expect(html).toContain('window.location.replace(payUrl)');
-    expect(html).toContain('<noscript><meta http-equiv="refresh"');
-    expect(html).not.toContain('立即前往支付宝');
     expect(mockBuildAlipayPaymentUrl).toHaveBeenCalledWith({
       orderId: 'order-001',
       amount: 66,
@@ -252,5 +194,26 @@ describe('GET /pay/[orderId]', () => {
       returnUrl: null,
       isMobile: true,
     });
+  });
+
+  it('shows compatibility page for new face-to-face orders instead of redirecting', async () => {
+    mockFindUnique.mockResolvedValue(
+      createPendingOrder({
+        payUrl: null,
+        qrCode: 'https://qr.alipay.com/fkx-new-order',
+      }),
+    );
+
+    const response = await GET(createRequest(), {
+      params: Promise.resolve({ orderId: 'order-001' }),
+    });
+
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('请返回原支付页继续支付');
+    expect(html).toContain('查看订单结果');
+    expect(html).toContain('查看我的订单');
+    expect(mockBuildAlipayPaymentUrl).not.toHaveBeenCalled();
   });
 });

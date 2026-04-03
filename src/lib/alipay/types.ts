@@ -7,6 +7,14 @@ export interface AlipayTradePagePayBizContent {
   body?: string;
 }
 
+/** 支付宝当面付 precreate bizContent */
+export interface AlipayTradePrecreateBizContent {
+  out_trade_no: string;
+  total_amount: string;
+  subject: string;
+  body?: string;
+}
+
 /** 支付宝统一响应结构 */
 export interface AlipayResponse {
   code: string;
@@ -36,6 +44,12 @@ export interface AlipayTradeRefundResponse extends AlipayResponse {
 export interface AlipayTradeCloseResponse extends AlipayResponse {
   trade_no?: string;
   out_trade_no?: string;
+}
+
+/** alipay.trade.precreate 响应 */
+export interface AlipayTradePrecreateResponse extends AlipayResponse {
+  out_trade_no?: string;
+  qr_code?: string;
 }
 
 /** 异步通知参数 */

@@ -155,7 +155,7 @@ PAYMENT_PROVIDERS=alipay,wxpay,stripe
 
 #### 支付宝官方
 
-直接对接支付宝开放平台，支持 PC 页面支付（`alipay.trade.page.pay`）和手机网站支付（`alipay.trade.wap.pay`），自动根据终端类型切换。
+直接对接支付宝开放平台，当前采用 **当面付**（`alipay.trade.precreate`）模式，由服务端预下单并向前端直出支付宝官方二维码。
 
 | 变量                 | 说明                         |
 | -------------------- | ---------------------------- |
@@ -163,7 +163,7 @@ PAYMENT_PROVIDERS=alipay,wxpay,stripe
 | `ALIPAY_PRIVATE_KEY` | 应用私钥（内容或文件路径）   |
 | `ALIPAY_PUBLIC_KEY`  | 支付宝公钥（内容或文件路径） |
 | `ALIPAY_NOTIFY_URL`  | 异步回调地址                 |
-| `ALIPAY_RETURN_URL`  | 同步跳转地址（可选）         |
+| `ALIPAY_RETURN_URL`  | 结果页回流地址（可选）       |
 
 #### 微信官方
 
@@ -365,7 +365,7 @@ Sub2API **v0.1.88** 及以上版本会自动拼接以下参数，无需手动添
        ▼
   用户完成支付
   ├─ EasyPay   → 扫码 / H5 跳转
-  ├─ 支付宝官方 → PC 页面支付 / H5 手机网站支付
+  ├─ 支付宝官方 → 当面付扫码
   ├─ 微信官方   → Native 扫码 / H5 支付
   └─ Stripe    → Payment Element (PaymentIntent)
        │

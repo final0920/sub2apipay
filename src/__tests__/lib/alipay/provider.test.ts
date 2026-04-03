@@ -13,10 +13,12 @@ vi.mock('@/lib/config', () => ({
 
 const mockPageExecute = vi.fn();
 const mockExecute = vi.fn();
+const mockPrecreateExecute = vi.fn();
 
 vi.mock('@/lib/alipay/client', () => ({
   pageExecute: (...args: unknown[]) => mockPageExecute(...args),
   execute: (...args: unknown[]) => mockExecute(...args),
+  precreateExecute: (...args: unknown[]) => mockPrecreateExecute(...args),
 }));
 
 const mockVerifySign = vi.fn();
@@ -57,7 +59,14 @@ describe('AlipayProvider', () => {
   });
 
   describe('createPayment', () => {
-    it('should return service short link as desktop qrCode', async () => {
+    it('should create face-to-face payment and return official qrCode for desktop', async () => {
+      mockPrecreateExecute.mockResolvedValue({
+        code: '10000',
+        msg: 'Success',
+        out_trade_no: 'order-001',
+        qr_code: 'https://qr.alipay.com/fkx001',
+      });
+
       const request: CreatePaymentRequest = {
         orderId: 'order-001',
         amount: 100,
@@ -69,18 +78,33 @@ describe('AlipayProvider', () => {
       const result = await provider.createPayment(request);
 
       expect(result.tradeNo).toBe('order-001');
-      expect(result.qrCode).toBe('https://pay.example.com/pay/order-001');
-      expect(result.payUrl).toBe('https://pay.example.com/pay/order-001');
+      expect(result.qrCode).toBe('https://qr.alipay.com/fkx001');
+      expect(result.payUrl).toBeUndefined();
       expect(mockExecute).not.toHaveBeenCalled();
       expect(mockPageExecute).not.toHaveBeenCalled();
+      expect(mockPrecreateExecute).toHaveBeenCalledWith(
+        {
+          out_trade_no: 'order-001',
+          total_amount: '100.00',
+          subject: 'Sub2API Balance Recharge 100.00 CNY',
+        },
+        {
+          notifyUrl: undefined,
+        },
+      );
     });
 
     it('should build short link from app url', () => {
       expect(buildAlipayEntryUrl('order-short-link')).toBe('https://pay.example.com/pay/order-short-link');
     });
 
-    it('should call pageExecute for mobile and return payUrl', async () => {
-      mockPageExecute.mockReturnValue('https://openapi.alipay.com/gateway.do?app_id=xxx&sign=yyy');
+    it('should create face-to-face payment and return official qrCode for mobile too', async () => {
+      mockPrecreateExecute.mockResolvedValue({
+        code: '10000',
+        msg: 'Success',
+        out_trade_no: 'order-002',
+        qr_code: 'https://qr.alipay.com/fkx002',
+      });
 
       const request: CreatePaymentRequest = {
         orderId: 'order-002',
@@ -94,17 +118,37 @@ describe('AlipayProvider', () => {
       const result = await provider.createPayment(request);
 
       expect(result.tradeNo).toBe('order-002');
-      expect(result.payUrl).toBe('https://openapi.alipay.com/gateway.do?app_id=xxx&sign=yyy');
-      expect(mockPageExecute).toHaveBeenCalledWith(
+      expect(result.qrCode).toBe('https://qr.alipay.com/fkx002');
+      expect(result.payUrl).toBeUndefined();
+      expect(mockPrecreateExecute).toHaveBeenCalledWith(
         {
           out_trade_no: 'order-002',
-          product_code: 'QUICK_WAP_WAY',
           total_amount: '50.00',
           subject: 'Sub2API Balance Recharge 50.00 CNY',
         },
-        expect.objectContaining({ method: 'alipay.trade.wap.pay' }),
+        {
+          notifyUrl: undefined,
+        },
       );
       expect(mockExecute).not.toHaveBeenCalled();
+      expect(mockPageExecute).not.toHaveBeenCalled();
+    });
+
+    it('should reject when precreate does not return qr_code', async () => {
+      mockPrecreateExecute.mockResolvedValue({
+        code: '10000',
+        msg: 'Success',
+        out_trade_no: 'order-003',
+      });
+
+      await expect(
+        provider.createPayment({
+          orderId: 'order-003',
+          amount: 10,
+          paymentType: 'alipay_direct',
+          subject: 'Face to face order',
+        }),
+      ).rejects.toThrow('missing qr_code');
     });
   });
 

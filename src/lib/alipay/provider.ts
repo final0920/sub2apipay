@@ -8,10 +8,15 @@ import type {
   RefundRequest,
   RefundResponse,
 } from '@/lib/payment/types';
-import { pageExecute, execute } from './client';
+import { pageExecute, execute, precreateExecute } from './client';
 import { verifySign } from './sign';
 import { getEnv } from '@/lib/config';
-import type { AlipayTradeQueryResponse, AlipayTradeRefundResponse, AlipayTradeCloseResponse } from './types';
+import type {
+  AlipayTradeQueryResponse,
+  AlipayTradeRefundResponse,
+  AlipayTradeCloseResponse,
+  AlipayTradePrecreateResponse,
+} from './types';
 import { parseAlipayNotificationParams } from './codec';
 
 export interface BuildAlipayPaymentUrlInput {
@@ -69,25 +74,26 @@ export class AlipayProvider implements PaymentProvider {
   };
 
   async createPayment(request: CreatePaymentRequest): Promise<CreatePaymentResponse> {
-    if (!request.isMobile) {
-      const entryUrl = buildAlipayEntryUrl(request.orderId);
-      return {
-        tradeNo: request.orderId,
-        payUrl: entryUrl,
-        qrCode: entryUrl,
-      };
+    const result: AlipayTradePrecreateResponse = await precreateExecute(
+      {
+        out_trade_no: request.orderId,
+        total_amount: request.amount.toFixed(2),
+        subject: request.subject,
+      },
+      {
+        notifyUrl: request.notifyUrl,
+      },
+    );
+
+    const qrCode = result.qr_code?.trim();
+    if (!qrCode) {
+      throw new Error(`Alipay precreate missing qr_code for order ${request.orderId}`);
     }
 
-    const payUrl = buildAlipayPaymentUrl({
-      orderId: request.orderId,
-      amount: request.amount,
-      subject: request.subject,
-      notifyUrl: request.notifyUrl,
-      returnUrl: request.returnUrl,
-      isMobile: true,
-    });
-
-    return { tradeNo: request.orderId, payUrl };
+    return {
+      tradeNo: result.out_trade_no?.trim() || request.orderId,
+      qrCode,
+    };
   }
 
   async queryOrder(tradeNo: string): Promise<QueryOrderResponse> {

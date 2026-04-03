@@ -48,4 +48,4 @@ export const PAYMENT_PREFIX = {
 } as const;
 
 /** 需要页面跳转（而非二维码）的支付方式 */
-export const REDIRECT_PAYMENT_TYPES = new Set<string>([PAYMENT_TYPE.ALIPAY_DIRECT]);
+export const REDIRECT_PAYMENT_TYPES = new Set<string>();
