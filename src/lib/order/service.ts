@@ -521,6 +521,29 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
 
 export type CancelOutcome = 'cancelled' | 'already_paid';
 
+async function resolveProviderForLifecycle(
+  paymentType: PaymentType,
+  providerInstanceId?: string | null,
+): Promise<any> {
+  if (providerInstanceId) {
+    const instance = await prisma.paymentProviderInstance.findUnique({
+      where: { id: providerInstanceId },
+      select: { providerKey: true },
+    });
+
+    if (instance?.providerKey === 'easypay') {
+      const instConfig = await getInstanceConfig(providerInstanceId);
+      if (instConfig) {
+        const { EasyPayProvider } = await import('@/lib/easy-pay/provider');
+        return new EasyPayProvider(providerInstanceId, instConfig);
+      }
+    }
+  }
+
+  initPaymentProviders();
+  return paymentRegistry.getProvider(paymentType);
+}
+
 /**
  * 核心取消逻辑 — 所有取消路径共用。
  * 调用前由 caller 负责权限校验（userId / admin 身份）。
@@ -539,20 +562,7 @@ export async function cancelOrderCore(options: {
   // 1. 平台侧处理
   if (paymentTradeNo && paymentType) {
     try {
-      let provider;
-      // 多实例：使用实例配置创建 provider
-      if (providerInstanceId) {
-        const instConfig = await getInstanceConfig(providerInstanceId);
-        if (instConfig) {
-          // 目前仅 easypay 支持多实例
-          const { EasyPayProvider } = await import('@/lib/easy-pay/provider');
-          provider = new EasyPayProvider(providerInstanceId, instConfig);
-        }
-      }
-      if (!provider) {
-        initPaymentProviders();
-        provider = paymentRegistry.getProvider(paymentType as PaymentType);
-      }
+      const provider = await resolveProviderForLifecycle(paymentType as PaymentType, providerInstanceId);
       const queryResult = await provider.queryOrder(paymentTradeNo);
 
       if (queryResult.status === 'paid') {
@@ -1235,18 +1245,7 @@ export async function processRefund(input: RefundInput): Promise<RefundResult> {
     // 2. 调用支付网关退款
     if (order.paymentTradeNo) {
       try {
-        let provider;
-        if (order.providerInstanceId) {
-          const instConfig = await getInstanceConfig(order.providerInstanceId);
-          if (instConfig) {
-            const { EasyPayProvider } = await import('@/lib/easy-pay/provider');
-            provider = new EasyPayProvider(order.providerInstanceId, instConfig);
-          }
-        }
-        if (!provider) {
-          initPaymentProviders();
-          provider = paymentRegistry.getProvider(order.paymentType as PaymentType);
-        }
+        const provider = await resolveProviderForLifecycle(order.paymentType as PaymentType, order.providerInstanceId);
         await provider.refund({
           tradeNo: order.paymentTradeNo,
           orderId: order.id,
